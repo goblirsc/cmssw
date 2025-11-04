@@ -90,6 +90,10 @@ BATCH_DIR=$(pwd)
 echo "Running at $(date) \n        on $HOST \n        in directory $BATCH_DIR."
 
 # set up the CMS environment (choose your release and working area):
+if [[ ! -z "${SINGULARITY_NAME}" ]] 
+then 
+    source /cvmfs/cms.cern.ch/cmsset_default.sh
+fi 
 cd CMSSW_RELEASE_AREA
 echo Setting up $(pwd) as CMSSW environment. 
 eval `scram runtime -sh`

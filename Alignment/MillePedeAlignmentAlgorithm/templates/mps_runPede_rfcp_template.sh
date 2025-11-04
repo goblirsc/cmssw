@@ -9,6 +9,12 @@ BATCH_DIR=$(pwd)
 echo -e "Running at $(date) \n        on ${HOSTNAME} \n        in directory ${BATCH_DIR}."
 
 # set up the CMS environment
+if [[ ! -z "${SINGULARITY_NAME}" ]] 
+then 
+    # Initialize CMSSW environment for container execution\\
+    source /cvmfs/cms.cern.ch/cmsset_default.sh
+fi 
+
 cd CMSSW_RELEASE_AREA
 eval `scram runtime -sh`
 hash -r
