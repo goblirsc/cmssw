@@ -43,6 +43,8 @@ numWFIB.extend([34034.0]) #Run4D120
 numWFIB.extend([34434.0]) #Run4D121
 numWFIB.extend([34834.0]) #Run4D122
 numWFIB.extend([35234.0]) #Run4D123
+numWFIB.extend([35634.0]) #Run4D124
+numWFIB.extend([36034.0]) #Run4D125
 
 #Additional sample for short matrix and IB
 #Default Phase-2 Det NoPU
@@ -79,6 +81,7 @@ numWFIB.extend([prefixDet+34.756]) # HLTTiming75e33, phase2_hlt_vertexTrimming
 numWFIB.extend([prefixDet+34.7561])# HLTTiming75e33, alpaka,phase2_hlt_vertexTrimming
 numWFIB.extend([prefixDet+34.7562])# HLTTiming75e33, alpaka,phase2_hlt_vertexTrimming,singleIterPatatrack
 numWFIB.extend([prefixDet+34.757]) # HLTTiming75e33, alpaka,singleIterPatatrack,trackingLST,seedingLST
+numWFIB.extend([prefixDet+34.7571]) # HLTTiming75e33, alpaka,singleIterPatatrack,trackingLST,seedingLST,buildingMkFit
 numWFIB.extend([prefixDet+34.758]) # HLTTiming75e33, ticl_barrel
 numWFIB.extend([prefixDet+34.759]) # HLTTiming75e33 + NANO
 numWFIB.extend([prefixDet+34.77])  # NGTScouting
