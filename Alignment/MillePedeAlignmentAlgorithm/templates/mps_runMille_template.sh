@@ -9,6 +9,7 @@
 # these defaults will be overwritten by MPS
 RUNDIR=$HOME/scratch0/some/path
 MSSDIR=/castor/cern.ch/user/u/username/another/path
+MPDIR=/afs/cern.ch/cms/CAF/CMSALCA/ALCA_TRACKERALIGN/MP/MPproduction/releases/local_MP/testing/V04-19-01-lapack/install
 MSSDIRPOOL=
 
 clean_up () {
@@ -100,6 +101,10 @@ echo The running directory is $(pwd).
 # Execute. The cfg file name will be overwritten by MPS
 time cmsRun the.cfg
 
+# get MP2 and convert to ROOT 
+source ${MPDIR}/mp2setup.sh
+cToRoot milleBinaryISN.root milleBInaryISN.dat 
+
 gzip -f *.log
 gzip milleBinaryISN.dat
 echo "\nDirectory content after running cmsRun and zipping log+dat files:"
@@ -154,6 +159,7 @@ else
   # copy the files
   echo "xrdcp -f milleBinaryISN.dat.gz ${MSSCAFDIR}/binaries/milleBinaryISN.dat.gz > /dev/null"
   untilSuccess xrdcp milleBinaryISN.dat.gz    ${MSSCAFDIR}/binaries/milleBinaryISN.dat.gz  1
+  untilSuccess xrdcp milleBinaryISN.root      ${MSSCAFDIR}/binaries/milleBinaryISN.root  1
   untilSuccess xrdcp treeFile.root            ${MSSCAFDIR}/tree_files/treeFileISN.root 1
   untilSuccess xrdcp millePedeMonitorISN.root ${MSSCAFDIR}/monitors/millePedeMonitorISN.root 1
 fi

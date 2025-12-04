@@ -769,11 +769,22 @@ std::string PedeSteerer::buildMasterSteer(const std::vector<std::string> &binary
 
   // add binary files to master steering file
   mainSteerRef << "\nCfiles\n";
+  std::vector<std::string> rootFiles = {}; 
   for (unsigned int iFile = 0; iFile < binaryFiles.size(); ++iFile) {
+    if (binaryFiles[iFile].find(".root") != std::string::npos){
+      rootFiles.push_back(binaryFiles[iFile]);
+      continue; 
+    }
     if (myRunDirectory.empty())
       mainSteerRef << binaryFiles[iFile] << "\n";
     else
       mainSteerRef << "../" + binaryFiles[iFile] << "\n";
+  }
+  if (!rootFiles.empty()){
+    mainSteerRef << "\nrootfiles\n";
+    for (const std::string & rootFile : rootFiles ) {
+        mainSteerRef << rootFile << "\n";
+    }
   }
 
   // add method
@@ -820,6 +831,7 @@ int PedeSteerer::runPede(const std::string &masterSteer) const {
   edm::LogInfo("Alignment") << "@SUB=PedeSteerer::runPede"
                             << "Start running " << command;
   // FIXME: Recommended interface to system commands?
+  // FIXME: pede does not return non-z0 exit codes. Should instead query millepede.end
   int shellReturn = gSystem->Exec(command.c_str());
   edm::LogInfo("Alignment") << "@SUB=PedeSteerer::runPede"
                             << "Command returns " << shellReturn;
