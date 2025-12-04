@@ -103,7 +103,7 @@ time cmsRun the.cfg
 
 # get MP2 and convert to ROOT 
 source ${MPDIR}/mp2setup.sh
-cToRoot milleBinaryISN.root milleBInaryISN.dat 
+cToRoot milleBinaryISN.root milleBinaryISN.dat 
 
 gzip -f *.log
 gzip milleBinaryISN.dat
