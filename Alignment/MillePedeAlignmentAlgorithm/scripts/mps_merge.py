@@ -82,7 +82,11 @@ for i in range(nJobs):
         continue
     firstentry = False
 
-    newName = 'milleBinary%03d.dat' % (i+1)
+    suffix = "dat" if not lib.rootIO else "root" 
+    prefix=""
+    if lib.rootIO:
+        prefix=f"root://eoscms.cern.ch/{lib.mssDir}/binaries/" 
+    newName = f"{prefix}milleBinary{i+1:03d}.{suffix}"
     if checkweight and (lib.JOBSP2[i]!='' and lib.JOBSP2[i]!='1.0'):
         weight = lib.JOBSP2[i]
         print('Adding %s to list of binary files using weight %s' % (newName,weight))

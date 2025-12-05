@@ -19,7 +19,7 @@
 #       elapsedTime     - seconds since last update
 #       mssDirPool      - pool for $mssDir (e.g. cmscaf/cmscafuser)
 #       pedeMem         - Memory allocated for pede
-#       spare1
+#       rootIO          - use ROOT I/O 
 #       spare2
 #       spare3
 
@@ -53,7 +53,7 @@ class jobdatabase:
     JOBREMARK, JOBSP1, JOBSP2, JOBSP3 = ([] for i in range(13))
 
     header, batchScript, cfgTemplate, infiList, classInf, addFiles, driver, mergeScript, \
-    mssDir, updateTimeHuman, mssDirPool, spare1, spare2, spare3 = ('' for i in range(14))
+    mssDir, updateTimeHuman, mssDirPool, rootIO, spare2, spare3 = ('' for i in range(14))
 
     updateTime, elapsedTime, pedeMem , nJobs = -1, -1, -1, -1
 
@@ -90,7 +90,7 @@ class jobdatabase:
         self.elapsedTime     = int(DBFILE.readline())
         self.mssDirPool      = DBFILE.readline().rstrip('\n')
         self.pedeMem         = int(DBFILE.readline())
-        self.spare1          = DBFILE.readline().rstrip('\n')
+        self.rootIO          = DBFILE.readline().rstrip('\n')
         self.spare2          = DBFILE.readline().rstrip('\n')
         self.spare3          = DBFILE.readline().rstrip('\n')
 
@@ -218,7 +218,7 @@ class jobdatabase:
             self.elapsedTime = self.currentTime - self.updateTime
         self.updateTime = self.currentTime
         self.updateTimeHuman = str(datetime.datetime.today())   #no timezone :(
-        self.spare1 = "-- unused --"
+        # self.rootIO = "-- unused --"
         self.spare2 = "-- unused --"
         self.spare3 = "-- unused --"
 
@@ -231,7 +231,7 @@ class jobdatabase:
                      self.classInf, self.addFiles, self.driver, self.mergeScript,
                      self.mssDir, self.updateTime, self.updateTimeHuman,
                      self.elapsedTime, self.mssDirPool, self.pedeMem,
-                     self.spare1, self.spare2, self.spare3 ]
+                     self.rootIO, self.spare2, self.spare3 ]
         for item in headData:
             DBFILE.write("%s\n" % item)
 

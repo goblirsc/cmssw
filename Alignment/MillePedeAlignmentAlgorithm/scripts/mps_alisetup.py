@@ -110,6 +110,7 @@ class SetupAlignment(object):
         parser.add_argument("alignmentConfig",
                             help=("name of the .ini config file that specifies "
                                   "the datasets to be used"))
+        parser.add_argument("-r" ,"--rootIO" ,dest="rootIO", help="use ROOT I/O", default=False,action="store_true")
 
         self._args = parser.parse_args(self._argv)
         self._config = ConfigParser.ConfigParser()
@@ -330,9 +331,13 @@ class SetupAlignment(object):
 
 
             # create mps_setup command
+            optROOT = []
+            if self._args.rootIO:
+                optROOT = ["-r"] 
             command = ["mps_setup.py",
                        "-m",
-                       append,
+                       append] \
+                     + optROOT + [
                        "-M", self._general_options["pedeMem"],
                        "-N", name,
                        self._mille_script,

@@ -26,6 +26,8 @@ parser.add_argument("-w", "--weight", type = float,
                     help = "assign statistical weight")
 parser.add_argument("-e", "--max-events", dest = "max_events", type = int,
                     help = "maximum number of events to process")
+parser.add_argument("-r", "--rootIO", dest="rootIO",action="store_true",default=False,
+                    help="Enable ROOT-based I/O")
 
 parser.add_argument("batch_script",
                     help = "path to the mille batch script template")
@@ -65,6 +67,7 @@ lib.mergeScript = args.merge_script
 lib.mssDirPool = ""
 lib.mssDir = args.mss_dir
 lib.pedeMem = args.memory
+lib.rootIO = args.rootIO
 
 
 if not os.access(args.batch_script, os.R_OK):
@@ -185,6 +188,7 @@ if args.append:
     tmpClass       = lib.classInf
     tmpMergeScript = lib.mergeScript
     tmpDriver      = lib.driver
+    tmpRoot        = lib.rootIO
 
     # Read DB file
     lib.read_db()
@@ -213,6 +217,7 @@ if args.append:
     lib.classInf    = tmpClass
     lib.mergeScript = tmpMergeScript
     lib.driver      = tmpDriver
+    lib.rootIO      = tmpRoot
 
 
 # Create (update) the local database
