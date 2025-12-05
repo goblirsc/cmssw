@@ -483,7 +483,7 @@ else:
                 os.system(command)
 
                 # rewrite theScript.sh using inly 'OK' jobs
-                command = 'mps_scriptm.pl -c '+lib.mergeScript+' '+scriptPath+' '+Path+' '+mergeCfg+' '+str(lib.nJobs)+' '+lib.mssDir+' '+lib.mssDirPool
+                command = 'mps_scriptm.pl -c '+lib.mergeScript+' '+scriptPath+' '+Path+' '+mergeCfg+' '+str(lib.nJobs)+' '+lib.mssDir+' '+lib.mssDirPool+ ' '+lib.mp2loc
                 os.system(command)
 
             else:

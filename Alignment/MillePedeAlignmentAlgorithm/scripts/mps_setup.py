@@ -28,6 +28,8 @@ parser.add_argument("-e", "--max-events", dest = "max_events", type = int,
                     help = "maximum number of events to process")
 parser.add_argument("-r", "--rootIO", dest="rootIO",action="store_true",default=False,
                     help="Enable ROOT-based I/O")
+parser.add_argument("--mp2loc", dest="mp2loc",type=str,default="",
+                    help="Set a custom Millepede-II installation location")
 
 parser.add_argument("batch_script",
                     help = "path to the mille batch script template")
@@ -67,7 +69,8 @@ lib.mergeScript = args.merge_script
 lib.mssDirPool = ""
 lib.mssDir = args.mss_dir
 lib.pedeMem = args.memory
-lib.rootIO = args.rootIO
+lib.rootIO = "True" if args.rootIO else ""
+lib.mp2loc = args.mp2loc
 
 
 if not os.access(args.batch_script, os.R_OK):
@@ -275,7 +278,7 @@ for j in range(1, args.n_jobs + 1):
                            "jobData/{}/theScript.sh".format(jobdir),
                            os.path.join(theJobData, jobdir), "the.py",
                            "jobData/{}/theSplit".format(jobdir), theIsn,
-                           args.mss_dir, lib.mssDirPool])
+                           args.mss_dir, lib.mssDirPool, lib.mp2loc])
 
 
 # create the merge job entry. This is always done. Whether it is used depends on the "merge" option.

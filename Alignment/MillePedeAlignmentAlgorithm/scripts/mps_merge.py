@@ -70,10 +70,12 @@ if match:
 else:
     print('Error in mps_merge: No setupAlgoMode found in baseconfig.')
 
-
 # build list of binary files
 binaryList = ''
-firstentry = True
+firstentry = True  
+prefix=""
+if lib.rootIO:
+    prefix=f"root://eoscms.cern.ch/{lib.mssDir}/binaries/" 
 for i in range(nJobs):
     separator = ',\n                '
     if firstentry:
@@ -83,9 +85,7 @@ for i in range(nJobs):
     firstentry = False
 
     suffix = "dat" if not lib.rootIO else "root" 
-    prefix=""
-    if lib.rootIO:
-        prefix=f"root://eoscms.cern.ch/{lib.mssDir}/binaries/" 
+  
     newName = f"{prefix}milleBinary{i+1:03d}.{suffix}"
     if checkweight and (lib.JOBSP2[i]!='' and lib.JOBSP2[i]!='1.0'):
         weight = lib.JOBSP2[i]
@@ -117,7 +117,7 @@ for i in range(nJobs):
         continue
     firstentry = False
 
-    newName = 'treeFile%03d.root' % (i+1)
+    newName = f"{prefix}treeFile{i+1:03d}.root"
     print('Adding %s to list of tree files.' % newName)
     treeList = '%s%s\'%s\'' % (treeList, separator, newName)
 

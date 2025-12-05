@@ -7,11 +7,19 @@
 # The batch job directory (will vanish after job end):
 BATCH_DIR=$(pwd)
 echo -e "Running at $(date) \n        on ${HOSTNAME} \n        in directory ${BATCH_DIR}."
+MP2LOC=""
 
 # set up the CMS environment
 cd CMSSW_RELEASE_AREA
 eval `scram runtime -sh`
 hash -r
+
+# setup custom MP-II installation if specified
+if [[ ! -z "${MP2LOC}" ]] 
+then 
+    echo -e "Using custom Millepede-II installation from\n        ${MP2LOC}"
+    source ${MP2LOC}/mp2setup.sh
+fi 
 
 cd ${BATCH_DIR}
 echo Running directory changed to $(pwd).

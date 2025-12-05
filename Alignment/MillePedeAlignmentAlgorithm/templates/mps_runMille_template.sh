@@ -9,7 +9,7 @@
 # these defaults will be overwritten by MPS
 RUNDIR=$HOME/scratch0/some/path
 MSSDIR=/castor/cern.ch/user/u/username/another/path
-MPDIR=/afs/cern.ch/cms/CAF/CMSALCA/ALCA_TRACKERALIGN/MP/MPproduction/releases/local_MP/testing/V04-19-01-lapack/install
+MP2LOC=""
 MSSDIRPOOL=
 
 clean_up () {
@@ -101,8 +101,14 @@ echo The running directory is $(pwd).
 # Execute. The cfg file name will be overwritten by MPS
 time cmsRun the.cfg
 
-# get MP2 and convert to ROOT 
-source ${MPDIR}/mp2setup.sh
+# setup custom MP-II installation if specified
+if [[ ! -z "${MP2LOC}" ]] 
+then 
+    echo -e "Using custom Millepede-II installation from\n        ${MP2LOC}"
+    source ${MP2LOC}/mp2setup.sh
+fi 
+
+# convert to ROOT 
 cToRoot milleBinaryISN.root milleBinaryISN.dat 
 
 gzip -f *.log
