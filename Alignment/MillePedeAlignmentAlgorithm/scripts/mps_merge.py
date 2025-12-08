@@ -109,6 +109,9 @@ else:
 # build list of tree files
 treeList =''
 firstentry = True
+prefix=""
+if lib.rootIO:
+    prefix=f"root://eoscms.cern.ch/{lib.mssDir}/tree_files/" 
 for i in range(nJobs):
     separator = ',\n                '
     if firstentry:

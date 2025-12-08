@@ -831,10 +831,23 @@ int PedeSteerer::runPede(const std::string &masterSteer) const {
   edm::LogInfo("Alignment") << "@SUB=PedeSteerer::runPede"
                             << "Start running " << command;
   // FIXME: Recommended interface to system commands?
-  // FIXME: pede does not return non-z0 exit codes. Should instead query millepede.end
-  int shellReturn = gSystem->Exec(command.c_str());
+  int shellReturn = 99; 
+  (void)gSystem->Exec(command.c_str());
+  // Pede as a fortran binary does not return an exit code. 
+  // Instead, we get a millepede.end file with a single 
+  // integer entry denoting the exit status. Pick this up here. 
+  std::ifstream mpend ("millepede.end"); 
+  // catch catastrophic failures where we do not get a status. 
+  if (!mpend.is_open()) {
+      edm::LogInfo("Alignment") << "@SUB=PedeSteerer::runPede" 
+                                << "Failed to read Pede command return"; 
+  }
+  else {
+    mpend >> shellReturn; 
+    mpend.close(); 
+  }
   edm::LogInfo("Alignment") << "@SUB=PedeSteerer::runPede"
-                            << "Command returns " << shellReturn;
+                              << "Command returns " << shellReturn;
 
   return shellReturn;
 }
