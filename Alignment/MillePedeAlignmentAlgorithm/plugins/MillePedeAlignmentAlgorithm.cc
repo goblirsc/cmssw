@@ -22,8 +22,8 @@
 #include "Alignment/MillePedeAlignmentAlgorithm/interface/MillePedeVariables.h"
 #include "Alignment/MillePedeAlignmentAlgorithm/interface/MillePedeVariablesIORoot.h"
 #include "Mille/MilleFactory.h"                                     // external Mille library
-#include "Alignment/MillePedeAlignmentAlgorithm/src/PedeSteerer.h"  // ditto
-#include "Alignment/MillePedeAlignmentAlgorithm/src/PedeReader.h"   // ditto
+#include "Alignment/MillePedeAlignmentAlgorithm/src/PedeSteerer.h"
+#include "Alignment/MillePedeAlignmentAlgorithm/src/PedeReader.h"
 #include "Alignment/MillePedeAlignmentAlgorithm/interface/PedeLabelerBase.h"
 #include "Alignment/MillePedeAlignmentAlgorithm/interface/PedeLabelerPluginFactory.h"
 
@@ -1461,8 +1461,8 @@ int MillePedeAlignmentAlgorithm ::callMille2D(const ReferenceTrajectoryBase::Ref
   float *newGlobDerivsX = &(newGlobDerivs[0]);
   float *newGlobDerivsY = &(newGlobDerivs[aGlobalDerivativesM.cols()]);
 
-  const int nLocal = aLocalDerivativesM.cols();
-  const int nGlobal = aGlobalDerivativesM.cols();
+  const size_t nLocal = aLocalDerivativesM.cols();
+  const size_t nGlobal = aGlobalDerivativesM.cols();
 
   if (diag && (newHitErrX > newHitErrY)) {  // also for 2D hits?
     // measurement with smaller error is x-measurement (for !is2D do not fill y-measurement):
@@ -1680,8 +1680,8 @@ void MillePedeAlignmentAlgorithm::addPxbSurvey(const edm::ParameterSet &pxbSurve
 
     // pass the results from the local fit to mille
     for (SurveyPxbImageLocalFit::count_t j = 0; j != SurveyPxbImageLocalFit::nMsrmts; j++) {
-      size_t nLocal = (int)measurements[i].getLocalDerivsSize();
-      size_t nGlobal = (int)measurements[i].getGlobalDerivsSize();
+      const size_t nLocal = measurements[i].getLocalDerivsSize();
+      const size_t nGlobal = measurements[i].getGlobalDerivsSize();
       prepareLocalLabels(nLocal);
       theMille->addData(measurements[i].getResiduum(j),
                         measurements[i].getSigma(j),
