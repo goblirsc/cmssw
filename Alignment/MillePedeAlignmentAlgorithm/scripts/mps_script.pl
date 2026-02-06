@@ -16,6 +16,11 @@
 #        translated to python the remaining CASTOR-related parts have to be
 #        removed.
 
+BEGIN {
+use File::Basename;
+unshift(@INC, dirname($0)."/mpslib");
+}
+use Mpslib;
 use POSIX;
 
 $inScript = "undefined";
@@ -72,6 +77,8 @@ while (@ARGV) {
   }
 }
 
+read_db();
+
 if ($isn eq "undefined") {
   print "Insufficient information given\n";
   exit 1;
@@ -109,6 +116,17 @@ if ($castorPool ne "undefined") {
 #... or empty the field.
   $nn = ($body =~ s/MSSDIRPOOL=(.*)$/MSSDIRPOOL=/m);
 }
+
+#replace MP2LOC setting 
+if ($mp2loc ne "") {
+  $nn = ($body =~ s/MP2LOC=(.*)$/MP2LOC=$mp2loc/m);
+} 
+#replace EXTRASETUP setting
+if ($extraSetup ne "") {
+  $nn = ($body =~ s/EXTRASETUP=(.*)$/EXTRASETUP=$extraSetup/m);
+} 
+# replace BINARYFORMAT setting
+$nn = ($body =~ s/BINARYFORMAT=(.*)$/BINARYFORMAT=$binaryFormat/m);
 
 # replace the cfg name
 $nn = ($body =~ m/cmsRun +([A-Z,a-z,0-9\-\.])/g);

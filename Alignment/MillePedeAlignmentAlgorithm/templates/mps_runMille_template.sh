@@ -10,7 +10,11 @@
 RUNDIR=$HOME/scratch0/some/path
 MSSDIR=/castor/cern.ch/user/u/username/another/path
 MSSDIRPOOL=
-
+BINARYFORMAT=
+# Custom MP-II install - will be potentially overwritten by steering 
+MP2LOC=""
+# Extra setup script - will be potentially overwritten by steering 
+EXTRASETUP=""   
 clean_up () {
 #try to recover log files and root files
     echo try to recover log files and root files ...
@@ -101,15 +105,33 @@ echo Setting up $(pwd) as CMSSW environment.
 eval `scram runtime -sh`
 rehash
 
+if [[ ! -z "${MP2LOC}" ]] 
+then 
+    echo -e "Using custom Millepede-II installation from\n        ${MP2LOC}"
+    source ${MP2LOC}/mp2setup.sh
+fi 
+
+# extra setup if required
+if [[ ! -z "${EXTRASETUP}" ]]
+then 
+    echo -e "Running extra environment setup:\n        ${EXTRASETUP}"
+    eval ${EXTRASETUP}
+fi 
+
 cd $BATCH_DIR
 echo The running directory is $(pwd).
 # Execute. The cfg file name will be overwritten by MPS
 time cmsRun the.cfg
 
+
 gzip -f *.log
-gzip milleBinaryISN.dat
+# compress binary file if needed (will do nothing if not required)
+gZipCommand=$(mps_gen_fname.py -g milleBinaryISN . $BINARYFORMAT)
+[[ -z "$gZipCommand" ]] || eval $gZipCommand 
 echo "\nDirectory content after running cmsRun and zipping log+dat files:"
 ls -lh 
+
+targetBinary=$(mps_gen_fname.py -o milleBinaryISN . $BINARYFORMAT )
 
 # Copy everything you need to MPS directory of your job,
 # but you might want to copy less stuff to save disk space
@@ -123,7 +145,7 @@ cp -p millePedeMonitor*root $RUNDIR
 # Their absence indicates typically that no events have been processed, 
 #   e.g. due to JSON exclusion, and there is no point in trying to 
 #   copy any files to mass storage.
-if [[ ! -f milleBinaryISN.dat.gz ]]
+if [[ ! -f $targetBinary ]]
 then
   echo "Missing milleBinary"
   return 1
@@ -158,8 +180,8 @@ else
   mkdir -p ${MSSCAFDIR}/tree_files
   mkdir -p ${MSSCAFDIR}/monitors
   # copy the files
-  echo "xrdcp -f milleBinaryISN.dat.gz ${MSSCAFDIR}/binaries/milleBinaryISN.dat.gz > /dev/null"
-  untilSuccess xrdcp milleBinaryISN.dat.gz    ${MSSCAFDIR}/binaries/milleBinaryISN.dat.gz  1
+  echo "xrdcp -f $targetBinary ${MSSCAFDIR}/binaries/$targetBinary > /dev/null"
+  untilSuccess xrdcp $targetBinary    ${MSSCAFDIR}/binaries/$targetBinary  1
   untilSuccess xrdcp treeFile.root            ${MSSCAFDIR}/tree_files/treeFileISN.root 1
   untilSuccess xrdcp millePedeMonitorISN.root ${MSSCAFDIR}/monitors/millePedeMonitorISN.root 1
 fi

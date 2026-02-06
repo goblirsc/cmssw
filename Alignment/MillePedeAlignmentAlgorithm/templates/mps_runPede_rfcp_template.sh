@@ -8,6 +8,13 @@
 BATCH_DIR=$(pwd)
 echo -e "Running at $(date) \n        on ${HOSTNAME} \n        in directory ${BATCH_DIR}."
 
+# Custom MP-II install - will be potentially overwritten by steering 
+MP2LOC=""   
+# Extra setup script - will be potentially overwritten by steering 
+EXTRASETUP=""   
+# will be overwritten by MPS
+BINARYFORMAT=""
+
 # in singularity containers, source baseline setup script
 if [[ ! -z "${SINGULARITY_NAME}" ]] 
 then 
@@ -18,6 +25,20 @@ fi
 cd CMSSW_RELEASE_AREA
 eval `scram runtime -sh`
 hash -r
+
+# setup custom MP-II installation if specified
+if [[ ! -z "${MP2LOC}" ]] 
+then 
+    echo -e "Using custom Millepede-II installation from\n        ${MP2LOC}"
+    source ${MP2LOC}/mp2setup.sh
+fi 
+
+# extra setup if required
+if [[ ! -z "${EXTRASETUP}" ]]
+then 
+    echo -e "Running extra environment setup:\n        ${EXTRASETUP}"
+    eval ${EXTRASETUP}
+fi 
 
 cd ${BATCH_DIR}
 echo Running directory changed to $(pwd).
@@ -140,6 +161,7 @@ export -f copytreefile
 rm -rf stager_get-commands.txt; touch stager_get-commands.txt
 rm -rf parallel-copy-commands.txt; touch parallel-copy-commands.txt
 if [ "${MSSDIRPOOL}" != "cmscafuser" ]; then
+
 # Not using cmscafuser pool => rfcp command must be used
   export STAGE_SVCCLASS=${MSSDIRPOOL}
   export STAGER_TRACE=
@@ -149,7 +171,9 @@ if [ "${MSSDIRPOOL}" != "cmscafuser" ]; then
   echo copytreefile rfcp ${MSSDIR}/treeFileISN.root ${BATCH_DIR} 0 >> parallel-copy-commands.txt
 else
   MSSCAFDIR=`echo ${MSSDIR} | perl -pe 's/\/castor\/cern.ch\/cms//gi'`
-  echo untilSuccess xrdcp ${MSSCAFDIR}/binaries/milleBinaryISN.dat.gz milleBinaryISN.dat.gz 1 >> parallel-copy-commands.txt
+  # will be replaced by the MPS
+  copyMeISN=$(mps_gen_fname.py -c milleBinaryISN ${MSSDIR}/binaries $BINARYFORMAT )
+  [[ -z "$copyMeISN" ]] || echo untilSuccess $copyMeISN  1 >> parallel-copy-commands.txt 
   echo copytreefile xrdcp ${MSSCAFDIR}/tree_files/treeFileISN.root treeFileISN.root 1 >> parallel-copy-commands.txt
 fi
 xargs -a stager_get-commands.txt -n 1 -P 10 -I {} bash -c '$@' _ {}
@@ -158,10 +182,6 @@ rm stager_get-commands.txt
 rm parallel-copy-commands.txt
 
 
-# We have gzipped binaries, but the python config looks for .dat
-# (could also try to substitute in config ".dat" with ".dat.gz"
-#  ONLY for lines which contain "milleBinary" using "sed '/milleBinary/s/.dat/.dat.gz/g'"):
-ln -s milleBinaryISN.dat.gz milleBinaryISN.dat
 
 cd ${BATCH_DIR}
 echo Running directory changed to $(pwd).
@@ -173,7 +193,9 @@ time cmsRun ${CONFIG_FILE}
 
 # clean up what has been staged in (to avoid copy mistakes...)
 rm treeFileISN.root
-rm milleBinaryISN.dat.gz milleBinaryISN.dat
+# will be replaced by the MPS
+removeISN=$(mps_gen_fname.py -r milleBinaryISN . $BINARYFORMAT ) 
+[[ -z "$removeISN" ]] || eval $removeISN
 
 # Gzip one by one in case one argument cannot be expanded:
 gzip -f *.log

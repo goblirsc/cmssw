@@ -19,9 +19,9 @@
 #       elapsedTime     - seconds since last update
 #       mssDirPool      - pool for $mssDir (e.g. cmscaf/cmscafuser)
 #       pedeMem         - Memory allocated for pede
-#       spare1
-#       spare2
-#       spare3
+#       binaryFormat      - I/O strategy for binary files
+#       mp2loc          - local installation of Millepede-II to use
+#       extraSetup      - extra commands to run to setup runtime
 
 # (2) Job-level variables/lists
 #       JOBNUMBER   - ADDED, selfexplanatory
@@ -53,7 +53,7 @@ class jobdatabase:
     JOBREMARK, JOBSP1, JOBSP2, JOBSP3 = ([] for i in range(13))
 
     header, batchScript, cfgTemplate, infiList, classInf, addFiles, driver, mergeScript, \
-    mssDir, updateTimeHuman, mssDirPool, spare1, spare2, spare3 = ('' for i in range(14))
+    mssDir, updateTimeHuman, mssDirPool, binaryFormat, mp2loc, extraSetup = ('' for i in range(14))
 
     updateTime, elapsedTime, pedeMem , nJobs = -1, -1, -1, -1
 
@@ -90,9 +90,9 @@ class jobdatabase:
         self.elapsedTime     = int(DBFILE.readline())
         self.mssDirPool      = DBFILE.readline().rstrip('\n')
         self.pedeMem         = int(DBFILE.readline())
-        self.spare1          = DBFILE.readline().rstrip('\n')
-        self.spare2          = DBFILE.readline().rstrip('\n')
-        self.spare3          = DBFILE.readline().rstrip('\n')
+        self.binaryFormat          = DBFILE.readline().rstrip('\n')
+        self.mp2loc          = DBFILE.readline().rstrip('\n')
+        self.extraSetup          = DBFILE.readline().rstrip('\n')
 
         #read actual jobinfo into arrays
         self.nJobs = 0
@@ -144,7 +144,10 @@ class jobdatabase:
         print('updateTime:\t',  self.updateTimeHuman)
         print('elapsed:\t',     self.elapsedTime)
         print('mssDirPool:\t',  self.mssDirPool)
-        print('pedeMem:\t',             self.pedeMem, '\n')
+        print('pedeMem:\t',     self.pedeMem)
+        print('binaryFormat:\t',  self.binaryFormat)
+        print('mp2loc:\t',     self.mp2loc)
+        print('extraSetup:\t',  self.extraSetup, '\n')
 
         #print interesting Job-level lists ---- to add: t/evt, fix remarks
         headFmt = '###     dir      jobid    stat  try  rtime      nevt  remark   weight  name'
@@ -218,9 +221,6 @@ class jobdatabase:
             self.elapsedTime = self.currentTime - self.updateTime
         self.updateTime = self.currentTime
         self.updateTimeHuman = str(datetime.datetime.today())   #no timezone :(
-        self.spare1 = "-- unused --"
-        self.spare2 = "-- unused --"
-        self.spare3 = "-- unused --"
 
         #if mps.db already exists, backup as mps.db~ (in case of interupt during write)
         os.system('[[ -a mps.db ]] && cp -p mps.db mps.db~')
@@ -231,7 +231,7 @@ class jobdatabase:
                      self.classInf, self.addFiles, self.driver, self.mergeScript,
                      self.mssDir, self.updateTime, self.updateTimeHuman,
                      self.elapsedTime, self.mssDirPool, self.pedeMem,
-                     self.spare1, self.spare2, self.spare3 ]
+                     self.binaryFormat, self.mp2loc, self.extraSetup ]
         for item in headData:
             DBFILE.write("%s\n" % item)
 

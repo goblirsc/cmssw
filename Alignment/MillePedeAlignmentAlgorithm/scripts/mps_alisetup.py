@@ -63,6 +63,9 @@ class SetupAlignment(object):
         self._general_options = {} # general options extracted from ini file
         self._external_datasets = collections.OrderedDict() # external dataset configs
         self._first_pede_config = True # does a pede job exist already?
+        self._binaryFormat = "Cgz" # IO strategy to use 
+        self._mp2loc = ""           # custom MP2-install to use     
+        self._extraSetup = ""       # extra runtime setup commands
 
         self._create_config()
         self._fill_general_options()
@@ -70,6 +73,9 @@ class SetupAlignment(object):
         self._construct_paths()
         self._create_mass_storage_directory()
         self._fetch_pede_settings()
+        self._fetch_IO_settings()
+        self._fetch_extra_setup()
+        self._fetch_millepede_settings()
         self._create_weight_configs()
 
 
@@ -246,6 +252,24 @@ class SetupAlignment(object):
             = ([x.strip()
                 for x in self._config.get("general", "pedesettings").split(",")]
                if self._config.has_option("general", "pedesettings") else [None])
+      
+    def _fetch_IO_settings(self):
+        """Fetch IO settings from general section in `self._config`."""
+
+        self._binaryFormat \
+            = self._config.get("general", "binaryFormat") if self._config.has_option("general", "binaryFormat") else "Cgz"
+        
+    def _fetch_extra_setup(self):
+        """Fetch IO settings from general section in `self._config`."""
+
+        self._extraSetup \
+            = self._config.get("general", "extraSetup") if self._config.has_option("general","extraSetup") else "" 
+
+
+    def _fetch_millepede_settings(self):
+        """Fetch Millepede installation settings from general section in `self._config`."""
+        self._millepede_loc \
+            = self._config.get("general","millepedeLocation") if self._config.has_option("general","millepedeLocation") else "" 
 
 
     def _create_mille_jobs(self):
@@ -259,6 +283,7 @@ class SetupAlignment(object):
         cdm_regex = re.compile('setupCosmicsDecoMode\s*\=\s*.*$', re.M)
         pw_regex = re.compile('setupPrimaryWidth\s*\=\s*.*$', re.M)
         json_regex = re.compile('setupJson\s*\=\s*.*$', re.M)
+        binFormat_regex = re.compile('binaryFileFormat\s*\=\s*.*$', re.M)
 
         first_dataset = True
         for name, dataset in self._datasets.items():
@@ -283,6 +308,9 @@ class SetupAlignment(object):
                              self._general_options["FirstRunForStartGeometry"], tmpFile)
             tmpFile = re.sub(collection_regex,
                              'setupCollection = \"'+dataset["collection"]+'\"',
+                             tmpFile)
+            tmpFile = re.sub(binFormat_regex,
+                             'binaryFileFormat = \"'+self._binaryFormat+'\"',
                              tmpFile)
             if "ALCARECOTkAlCosmics" in dataset["collection"]:
                 if dataset['cosmicsZeroTesla']:
@@ -345,6 +373,14 @@ class SetupAlignment(object):
                        "cmscafuser:"+self._mss_dir]
             if dataset["numberOfEvents"] > 0:
                 command.extend(["--max-events", str(dataset["numberOfEvents"])])
+            command.extend(["--binaryFormat", self._binaryFormat]) 
+            if self._millepede_loc != "":
+                command.extend(["--mp2loc",self._millepede_loc]) 
+            if self._extraSetup != "":
+                if not self._extraSetup.startswith("\""):
+                    # make sure extra setup is quoted. 
+                    self._extraSetup = f"\"{self._extraSetup}\""
+                command.extend(["--extraSetup",self._extraSetup]) 
             command = [x for x in command if len(x.strip()) > 0]
 
             # Some output:
@@ -363,7 +399,10 @@ class SetupAlignment(object):
                 print("Jsonfile:          ", dataset["json"])
             if self._args.verbose:
                 print("Pass to mps_setup: ", " ".join(command))
-
+            if self._millepede_loc != "":
+                print("Using Millepede installation from ",self._millepede_loc)
+            if self._extraSetup != "":
+                print("Running additional setup script/command: ",self._extraSetup)
             # call the command and toggle verbose output
             self._handle_process_call(command, self._args.verbose)
 

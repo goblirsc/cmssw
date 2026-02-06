@@ -46,6 +46,7 @@ setupRecoGeometry     = "placeholder_recogeometry"
 setupPrimaryWidth     = -1.0
 setupJson             = "placeholder_json"
 setupRunStartGeometry = -1
+binaryFileFormat      = "placeholder_format"
 
 import FWCore.ParameterSet.Config as cms
 if not setupRecoGeometry:  # empty string defaults to DB
@@ -63,9 +64,13 @@ else:
 # Default is "mille". Gets changed to "pede" by mps_merge.
 setupAlgoMode         = "mille"
 
-# MPS looks specifically for the string "ISN" so don't change this.
+# MPS looks specifically for the strings "ISN" and "FMT" so don't change this.
 setupMonitorFile      = "millePedeMonitorISN.root"
-setupBinaryFile       = "milleBinaryISN.dat"
+from Alignment.MillePedeAlignmentAlgorithm.mpslib.mps_formats import mps_formats 
+baseBinaryFile       = "milleBinaryISN"
+
+mpf = mps_formats()
+setupBinaryFile = mpf.milleOutFile(baseBinaryFile,mpf.identifyFormat(binaryFileFormat))
 
 # Input files. Edited by mps_splice.py
 readFiles = cms.untracked.vstring()
@@ -324,3 +329,18 @@ else:
                binary_files = merge_binary_files,
                tree_files = merge_tree_files,
                run_start_geometry = setupRunStartGeometry)
+    
+
+################################################################################
+## Uncomment the following if the jobs fail with ROOT-related exceptions
+## (FileReadError - fCurrentClusterStart=X  fEntryCurrent=Y fNextClusterStart=Z 
+## but fEntryCurrent should not be in between the two) - https://github.com/cms-sw/cmssw/issues/49398 
+# # 
+# # to disable the cache
+# process.source.cacheSize = cms.untracked.uint32(0)
+# # download and cache the file locally to prevent a storm of singular reads to EOS
+# process.add_(cms.Service("SiteLocalConfigService",
+#                             overrideSourceCacheHintDir = cms.untracked.string("lazy-download")
+#                             ))
+
+# ------------------------------------------------------------------------------

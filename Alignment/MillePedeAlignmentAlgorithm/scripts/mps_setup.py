@@ -48,6 +48,12 @@ parser.add_argument("merge_script",
                     help = "path to the pede batch script template")
 parser.add_argument("mss_dir",
                     help = "name of the mass storage directory")
+parser.add_argument("--binaryFormat", dest="binaryFormat",type=str,default="Cgz",
+                    help="Choose binary format")
+parser.add_argument("--mp2loc", dest="mp2loc",type=str,default="",
+                    help="Set a custom Millepede-II installation location")
+parser.add_argument("--extraSetup", dest="extraSetup",type=str,default="",
+                    help="Set a custom script for additional environment setup")
 
 args = parser.parse_args(sys.argv[1:])
 
@@ -65,6 +71,9 @@ lib.mergeScript = args.merge_script
 lib.mssDirPool = ""
 lib.mssDir = args.mss_dir
 lib.pedeMem = args.memory
+lib.binaryFormat = args.binaryFormat
+lib.mp2loc = args.mp2loc
+lib.extraSetup = args.extraSetup
 
 
 if not os.access(args.batch_script, os.R_OK):
@@ -185,6 +194,9 @@ if args.append:
     tmpClass       = lib.classInf
     tmpMergeScript = lib.mergeScript
     tmpDriver      = lib.driver
+    tmpBinaryFormat = lib.binaryFormat
+    tmpMp2loc = lib.mp2loc
+    tmpExtraSetup = lib.extraSetup
 
     # Read DB file
     lib.read_db()
@@ -213,6 +225,9 @@ if args.append:
     lib.classInf    = tmpClass
     lib.mergeScript = tmpMergeScript
     lib.driver      = tmpDriver
+    lib.binaryFormat = tmpBinaryFormat
+    lib.mp2loc = tmpMp2loc
+    lib.extraSetup = tmpExtraSetup
 
 
 # Create (update) the local database
@@ -263,7 +278,7 @@ for j in range(1, args.n_jobs + 1):
                    "jobData/{}/the.py".format(jobdir),
                    theIsn)
 
-
+    lib.write_db()
     # create the run script
     print("mps_script.pl {}  jobData/{}/theScript.sh {}/{} the.py jobData/{}/theSplit {} {} {}".format(args.batch_script, jobdir, theJobData, jobdir, jobdir, theIsn, args.mss_dir, lib.mssDirPool))
     mps_tools.run_checked(["mps_script.pl", args.batch_script,

@@ -8,11 +8,13 @@
 
 from builtins import range
 import Alignment.MillePedeAlignmentAlgorithm.mpslib.Mpslibclass as mpslib
+from Alignment.MillePedeAlignmentAlgorithm.mpslib.mps_formats import mps_formats
 import re
 import os
 import argparse
 
 lib = mpslib.jobdatabase()
+formats = mps_formats()
 
 ## Parse arguments
 ## -----------------------------------------------------------------------------
@@ -46,8 +48,7 @@ nJobs       = args.nJobs
 checkok     = args.checkok
 checkweight = args.checkweight
 
-if checkok or checkweight:
-    lib.read_db()
+lib.read_db()
 
 ## create merge config
 ## -----------------------------------------------------------------------------
@@ -82,7 +83,7 @@ for i in range(nJobs):
         continue
     firstentry = False
 
-    newName = 'milleBinary%03d.dat' % (i+1)
+    newName = formats.pathForPede(os.path.join(lib.mssDir,"binaries"),f"milleBinary{i+1:03d}",formats.identifyFormat(lib.binaryFormat))
     if checkweight and (lib.JOBSP2[i]!='' and lib.JOBSP2[i]!='1.0'):
         weight = lib.JOBSP2[i]
         print('Adding %s to list of binary files using weight %s' % (newName,weight))
@@ -100,6 +101,10 @@ if match:
                   body)
 else:
     print('Error in mps_merge: No \'placeholder_binaryList\' found in baseconfig.')
+
+# replace the targetBinaryFormat 
+if match: 
+    body = body.replace("placeholder_binary_format",lib.binaryFormat)
 
 
 # build list of tree files

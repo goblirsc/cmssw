@@ -489,7 +489,7 @@ else:
                 command ='mps_merge.py -w -c '+inCfgPath+' '+Path+'/'+mergeCfg+' '+Path+' '+str(lib.nJobs)
                 os.system(command)
 
-                # rewrite theScript.sh using inly 'OK' jobs
+                # rewrite theScript.sh using only 'OK' jobs
                 command = 'mps_scriptm.pl -c '+lib.mergeScript+' '+scriptPath+' '+Path+' '+mergeCfg+' '+str(lib.nJobs)+' '+lib.mssDir+' '+lib.mssDirPool
                 os.system(command)
 

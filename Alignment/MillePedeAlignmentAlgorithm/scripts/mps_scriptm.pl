@@ -80,9 +80,7 @@ if ($cfgName eq "undefined") {
   exit 1;
 }
 
-if ($checkok == 1) {
-  read_db();
-}
+read_db();
 
 # open the input file
 open INFILE,"$inScript";
@@ -122,6 +120,20 @@ if ($castorPool ne "undefined") {
 #... or empty the field.
   $nn = ($body =~ s/MSSDIRPOOL=(.*)$/MSSDIRPOOL=/m);
 }
+#replace MP2LOC setting 
+if ($mp2loc ne "") {
+  $nn = ($body =~ s/MP2LOC=(.+)$/MP2LOC=$mp2loc/m);
+} 
+#replace EXTRASETUP setting
+if ($extraSetup ne "") {
+  $nn = ($body =~ s/EXTRASETUP=(.+)$/EXTRASETUP=$extraSetup/m);
+} 
+# replace BINARYFORMAT setting
+$nn = ($body =~ m/BINARYFORMAT=(.+)$/m);
+if ($nn != 1) {
+  print "mps_script.pl: no (unambiguous) BINARYFORMAT directive found in runscript\n";
+}
+$nn = ($body =~ s/BINARYFORMAT=(.+)$/BINARYFORMAT=$binaryFormat/m);
 
 # now we have to expand lines that contain the ISN directive
 @LINES = split "\n",$body;
