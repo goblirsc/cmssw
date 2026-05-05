@@ -135,6 +135,7 @@ public:
     void produce(edm::Event &e, const edm::EventSetup &c) override;
 
 private:
+
     // event state, encapsuled to ensure thread safety 
     struct TripletSeederEventState{
         SeedingGrid grid; 
@@ -153,7 +154,13 @@ private:
      /// using the seeding grid, form triplets
      bool formTriplets(const TripletSeederEventState & state, std::vector<protoSeed> & found);
 
-     /// get the triplets for one particular cell combination
+     /// get the triplets for a pre-selected top-candidate grid cell
+     void formTriplets(int xBin, int yBin, int zBin, 
+                       const TripletSeederEventState & state,
+                       std::vector<protoSeed> & found, 
+                       std::unordered_multiset<const BaseTrackerRecHit*> & trackUsage);
+
+     /// get the triplets for already selected lists of candidate hits
      void formTriplets(const std::vector<const BaseTrackerRecHit*> & topCands, 
                        const std::vector<const BaseTrackerRecHit*> & centerCands, 
                        const std::vector<const BaseTrackerRecHit*> & bottomCands, 
@@ -161,9 +168,9 @@ private:
                        std::vector<protoSeed> & found, 
                        std::unordered_multiset<const BaseTrackerRecHit*> & trackUsage);
      /// fit the triplets with kalman into trajectory seeds
-     bool fitTriplets(const TripletSeederEventState & state, const std::vector<protoSeed>& seeds, TrajectorySeedCollection & output);
+     bool fitTriplets(const TripletSeederEventState & state, const std::vector<protoSeed>& triplets, TrajectorySeedCollection & output);
      /// fit of a single triplet into a trajectory seed 
-     bool fitTriplet(const TripletSeederEventState & state, const protoSeed& seed, TrajectorySeedCollection & output);
+     bool fitTriplet(const TripletSeederEventState & state, const protoSeed& triplet, TrajectorySeedCollection & output);
 
     /// helper borrowed from SimpleCosmicBONSeeder - possibly refactor into helper class for deployment
     std::pair<GlobalVector, int> pqFromHelixFit(const GlobalPoint &inner,
