@@ -17,10 +17,10 @@ from RecoTracker.PixelLowPtUtilities.siPixelClusterShapeCache_cfi import *
 # CTF
 from RecoTracker.SpecialSeedGenerators.CombinatorialSeedGeneratorForCosmicsP5_cff import *
 from RecoTracker.SpecialSeedGenerators.SimpleCosmicBONSeeder_cff import *
+from RecoTracker.SpecialSeedGenerators.CosmicGridSeeder_cff import * 
 from RecoTracker.TkSeedGenerator.GlobalCombinedSeeds_cff import *
 combinedP5SeedsForCTF = RecoTracker.TkSeedGenerator.GlobalCombinedSeeds_cfi.globalCombinedSeeds.clone(
-    seedCollections   = ['combinatorialcosmicseedfinderP5',
-	                 'simpleCosmicBONSeeds']
+    seedCollections   = ['cosmicGridTripletSeeds']
 )
 
 from RecoTracker.CkfPattern.CkfTrackCandidatesP5_cff import *
@@ -41,16 +41,13 @@ from RecoTracker.FinalTrackSelectors.CTFFinalTrackSelectorP5_cff import *
 ckfTrackCandidatesP5LHCNavigation    = ckfTrackCandidatesP5.clone(NavigationSchool = 'SimpleNavigationSchool')
 ctfWithMaterialTracksP5LHCNavigation = ctfWithMaterialTracksCosmics.clone(src = "ckfTrackCandidatesP5LHCNavigation")
 
-ctftracksP5Task = cms.Task(combinatorialcosmicseedinglayersP5Task,
-                                  combinatorialcosmicseedfinderP5,
-                                  simpleCosmicBONSeedingLayers,
-                                  simpleCosmicBONSeeds,
+ctftracksP5Task = cms.Task(       cosmicGridTripletSeeds,
                                   combinedP5SeedsForCTF,
-                                  ckfTrackCandidatesP5,
-                                  ctfWithMaterialTracksCosmics,
-                                  ctfWithMaterialTracksP5,
-                                  ckfTrackCandidatesP5LHCNavigation,
-                                  ctfWithMaterialTracksP5LHCNavigation)
+                                  ckfTrackCandidatesP5, # CKF built from seeds
+                                  ctfWithMaterialTracksCosmics, # these are TrackCandidatesP5 + CKF fit 
+                                  ctfWithMaterialTracksP5,  # This is adding track selection on ctfWithMaterialTracksCosmics
+                                  ckfTrackCandidatesP5LHCNavigation,    # this is the CKF candidates using the collision-style navigation
+                                  ctfWithMaterialTracksP5LHCNavigation) # CKF candidates  using the collision-style navigation
 ctftracksP5 = cms.Sequence(ctftracksP5Task)
 
 from RecoTracker.FinalTrackSelectors.cosmicTrackSplitter_cfi import *
@@ -79,10 +76,12 @@ trackerCosmics_TopBot = cms.Sequence(trackerCosmics_TopBotTask)
 #dEdX reconstruction
 from RecoTracker.DeDx.dedxEstimators_Cosmics_cff import *
 # (SK) keep rstracks commented out in case of resurrection
+
 tracksP5Task = cms.Task(cosmictracksP5Task,
                             ctftracksP5Task,
                             doAllCosmicdEdXEstimatorsTask,
                             siPixelClusterShapeCache)
+phase2_tracker.toReplaceWith(tracksP5Task,tracksP5Task.copyAndExclude([cosmictracksP5Task, doAllCosmicdEdXEstimatorsTask, siPixelClusterShapeCache]))
 tracksP5 = cms.Sequence(tracksP5Task)
 tracksP5_wodEdX = tracksP5.copy()
 tracksP5_wodEdX.remove(doAllCosmicdEdXEstimators)

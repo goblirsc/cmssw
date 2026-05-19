@@ -8,6 +8,7 @@
 // user include files
 #include "DataFormats/GeometryVector/interface/GlobalPoint.h"
 #include "DataFormats/GeometryVector/interface/GlobalVector.h"
+#include "DataFormats/TrackerRecHit2D/interface/BaseTrackerRecHit.h"
 #include "DataFormats/TrackerRecHit2D/interface/VectorHit2D.h"
 #include "DataFormats/TrackingRecHit/interface/TrackingRecHit.h"
 #include "DataFormats/TrajectorySeed/interface/TrajectorySeed.h"
@@ -139,6 +140,7 @@ private:
     // event state, encapsuled to ensure thread safety 
     struct TripletSeederEventState{
         SeedingGrid grid; 
+        std::map<const VectorHit*, std::vector<const BaseTrackerRecHit*>> vhConstituents; 
         const MagneticField *magfield = nullptr;
         const TrackerGeometry *tracker = nullptr;
         TkClonerImpl cloner;  // FIXME

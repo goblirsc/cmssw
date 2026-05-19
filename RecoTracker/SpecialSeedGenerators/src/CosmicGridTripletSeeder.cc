@@ -16,6 +16,7 @@
 #include "FWCore/Utilities/interface/isFinite.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
 #include "RecoTracker/TkSeedGenerator/interface/FastHelix.h"
+#include "RecoTracker/TkSeedingLayers/interface/SeedingHitSet.h"
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateTransform.h"
 #include "RecoTracker/SpecialSeedGenerators/interface/CosmicGridTripletSeeder.h"
 
@@ -46,11 +47,11 @@ std::pair<GlobalVector, int> CosmicGridTripletSeeder::pqFromHelixFit(const Globa
                                                                      const GlobalPoint& middle,
                                                                      const GlobalPoint& outer,
                                                                      const MagneticField* magfield) {
-  std::cout << "DEBUG PZ =====" << std::endl;
+  // std::cout << "DEBUG PZ =====" << std::endl;
   FastHelix helix(inner, middle, outer, magfield->nominalValue(), magfield);
-  GlobalVector gv = helix.stateAtVertex().momentum();  // status on inner hit
-  std::cout << "FastHelix P = " << gv << "\n";
-  std::cout << "FastHelix Q = " << helix.stateAtVertex().charge() << "\n";
+  // GlobalVector gv = helix.stateAtVertex().momentum();  // status on inner hit
+  // std::cout << "FastHelix P = " << gv << "\n";
+  // std::cout << "FastHelix Q = " << helix.stateAtVertex().charge() << "\n";
 
   // My attempt (with different approx from FastHelix)
   // 1) fit the circle
@@ -80,11 +81,11 @@ std::pair<GlobalVector, int> CosmicGridTripletSeeder::pqFromHelixFit(const Globa
 
   std::pair<GlobalVector, int> mypq(GlobalVector(px, py, pz), myq);
 
-  std::cout << "Gio: pt = " << pt << std::endl;
-  std::cout << "Gio: dz = " << dz << ", sinphi = " << sinphi << ", dphi = " << dphi
-            << ", dz/drphi = " << (dz / dphi / rho) << std::endl;
-  std::cout << "Gio's fit P = " << mypq.first << "\n";
-  std::cout << "Gio's fit Q = " << myq << "\n";
+  // std::cout << "Gio: pt = " << pt << std::endl;
+  // std::cout << "Gio: dz = " << dz << ", sinphi = " << sinphi << ", dphi = " << dphi
+  //           << ", dz/drphi = " << (dz / dphi / rho) << std::endl;
+  // std::cout << "Gio's fit P = " << mypq.first << "\n";
+  // std::cout << "Gio's fit Q = " << myq << "\n";
 
   return mypq;
 }
@@ -94,6 +95,7 @@ CosmicGridTripletSeeder::TripletSeederEventState CosmicGridTripletSeeder::initEv
   auto tracker = &c.getData(trackerToken_);
   auto cloner = dynamic_cast<TkTransientTrackingRecHitBuilder const&>(c.getData(ttrhBuilderToken_)).cloner();
   return TripletSeederEventState{SeedingGrid{8, -120., 120., 6, -120., 120., 8, -280., 280.},
+                                 {},
                                  magfield,
                                  tracker,
                                  cloner,
@@ -140,7 +142,7 @@ bool CosmicGridTripletSeeder::populateGrid(const edm::Event& iEvent, CosmicGridT
         vhSeen.push_back(&vh); 
       }
   }
-  std::cout << " CGS: Done adding vector hits, now have "<<vhSeen.size()<<" unique hits"<< std::endl; 
+  // std::cout << " CGS: Done adding vector hits, now have "<<vhSeen.size()<<" unique hits"<< std::endl; 
   /// step 2: Add remaining OT hits, excluding those already on vector hits 
   for (auto  ds : otHitCollection){
       for (const Phase2TrackerRecHit1D & otHit : ds){
@@ -148,35 +150,33 @@ bool CosmicGridTripletSeeder::populateGrid(const edm::Event& iEvent, CosmicGridT
         for (const auto* vh : vhSeen){
             if (vh->sharesInput(&otHit,TrackingRecHit::some)){
                 unique = false; 
+                state.vhConstituents[vh].push_back(&otHit);
                 break; 
             }
         }
         if (!unique){
-            std::cout << " skip a hit overlapping with VH" << std::endl; 
+            // std::cout << " skip a hit overlapping with VH" << std::endl; 
             continue; 
-        }
-        if (recHitsSeen.contains(&otHit)){
-            std::cout << "this is already on a VH!"<< std::endl; 
-            continue;
         }
         state.grid.addHit(&otHit); 
         recHitsSeen.insert(&otHit); 
       }
   }
-  std::cout << " CGS: Done adding strip hits, now have "<<recHitsSeen.size() + vhSeen.size()<<" unique hits"<< std::endl; 
+  // std::cout << " CGS: Done adding strip hits, now have "<<recHitsSeen.size() + vhSeen.size()<<" unique hits"<< std::endl; 
   /// step 3: Add pixel hits if desired  
   for (auto  ds : pixelHitCollection){
       for (const SiPixelRecHit & pix : ds){
         state.grid.addHit(&pix); 
       }
   }
-  std::cout << " CGS: Done adding pixel hits, now have "<<recHitsSeen.size()<<" unique hits"<< std::endl; 
+  // std::cout << " CGS: Done adding pixel hits, now have "<<recHitsSeen.size()<<" unique hits"<< std::endl; 
 
   // now sort all bins of the grid by ascending global y.
   state.grid.sort(); 
 
   return true;
 }
+
 /// using the seeding grid, form triplets
 bool CosmicGridTripletSeeder::formTriplets(const CosmicGridTripletSeeder::TripletSeederEventState & state, std::vector<CosmicGridTripletSeeder::protoSeed> & found){
     std::unordered_multiset<const BaseTrackerRecHit*> trackUsage; 
@@ -191,7 +191,7 @@ bool CosmicGridTripletSeeder::formTriplets(const CosmicGridTripletSeeder::Triple
         }
       }
     }
-    std::cout << " found "<<found.size()<<" new triplets "<< std::endl;
+    // std::cout << " found "<<found.size()<<" new triplets "<< std::endl;
     return true; 
 }
 
@@ -271,9 +271,161 @@ bool CosmicGridTripletSeeder::fitTriplets(const CosmicGridTripletSeeder::Triplet
     for (const protoSeed & ps : triplets ){
       fitTriplet(state, ps, output); 
     }
-    std::cout << " built "<<output.size()<<" seeds from "<<triplets.size()<<" triplets "<< std::endl; 
+    // std::cout << " built "<<output.size()<<" seeds from "<<triplets.size()<<" triplets "<< std::endl; 
     return true; 
 }
+// /// fit of a single triplet into a trajectory seed 
+// bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletSeederEventState & state, const CosmicGridTripletSeeder::protoSeed& triplet, TrajectorySeedCollection & output){
+//   typedef TrajectoryStateOnSurface TSOS;
+
+
+//     OrderedHitTriplet trip = triplet;  
+
+
+//     GlobalPoint top =
+//         state.tracker->idToDet((*(trip.inner())).geographicalId())->surface().toGlobal((*(trip.inner())).localPosition());
+
+//     GlobalPoint middle =
+//         state.tracker->idToDet((*(trip.middle())).geographicalId())->surface().toGlobal((*(trip.middle())).localPosition());
+
+//     GlobalPoint bottom =
+//         state.tracker->idToDet((*(trip.outer())).geographicalId())->surface().toGlobal((*(trip.outer())).localPosition());
+
+//     // First use FastHelix out of the box
+//     std::pair<GlobalVector, int> pq = pqFromHelixFit(top, middle, bottom, state.magfield);
+//     GlobalVector gv = pq.first;
+//     float ch = pq.second;
+//     float Mom = sqrt(gv.x() * gv.x() + gv.y() * gv.y() + gv.z() * gv.z());
+
+//     if (Mom > 10000 || edm::isNotFinite(Mom)) {
+//         // std::cout << "Processing triplet " << ": fail for momentum." << std::endl;
+//       return false;
+//     }
+
+//     if (gv.perp() < 2.5) {
+//         // std::cout << "Processing triplet " << ": fail for pt = " << gv.perp() << " < ptMin = 2.5"
+//                   // << std::endl;
+//       return false;
+//     }
+
+//     const Propagator *propagator = state.thePropagatorOp.get();
+//     // } else {
+//     //   gv = -1 * gv;
+//     //   ch = -1. * ch;
+//     //   propagator = state.thePropagatorOp.get();
+//     //     // std::cout << "Processing triplet " << ":  upgoing." << std::endl;
+//     // }
+
+//     // if ((gv.z() * (bottom.z() - top.z()) > 0) && (fabs(bottom.z() - top.z()) > 5) && (fabs(gv.z()) > .01)) {
+//       // std::cout << "ORRORE: outer.z()-top.z() = " << (outer.z() - top.z()) << ", gv.z() = " << gv.z()
+//       //           << std::endl;
+//     // }
+
+//     GlobalTrajectoryParameters Gtp(bottom, gv, int(ch), state.magfield);
+//     FreeTrajectoryState CosmicSeed(Gtp, CurvilinearTrajectoryError(AlgebraicSymMatrix55(AlgebraicMatrixID())));
+//     CosmicSeed.rescaleError(100);
+//     // std::cout << "Processing triplet " << ". start from " << std::endl;
+//     // std::cout << "    X  = " << outer << ", P = " << gv << std::endl;
+//     // std::cout << "    Cartesian error (X,P) = \n" << CosmicSeed.cartesianError().matrix() << std::endl;
+
+//     edm::OwnVector<TrackingRecHit> hits;
+//     std::vector<const BaseTrackerRecHit*> seedHits;
+//     for (const BaseTrackerRecHit* hit : {trip.inner(), trip.middle(), trip.outer()}){
+//       const VectorHit* vh = dynamic_cast<const VectorHit*>(hit);
+//       if (vh){
+//         auto found = state.vhConstituents.find(vh);
+//         if (found != state.vhConstituents.end()){
+//           for (auto & component : found->second){
+//             seedHits.push_back(component);
+//           }
+//         }
+//       }
+//       else{
+//         seedHits.push_back(hit);
+//       }
+//     }
+//     std::sort(seedHits.begin(), seedHits.end(), [](const BaseTrackerRecHit* h1, const BaseTrackerRecHit* h2){return h1->globalPosition().y() > h2->globalPosition().y();}); 
+      
+//     TSOS propagated, updated;
+//     bool fail = false;
+//     for (size_t ih = 0; ih < seedHits.size(); ++ih) {
+//       // if ((ih == 2) && seedOnMiddle_) {
+//       //   if (seedVerbosity_ > 2)
+//       //     std::cout << "Stopping at middle hit, as requested." << std::endl;
+//       //   break;
+//       // }
+//       std::cout << " try to prop to "<<seedHits[ih]->globalPosition()<<std::endl; 
+//       if (ih == 0) {
+//         propagated = propagator->propagate(CosmicSeed, state.tracker->idToDet((*seedHits[ih]).geographicalId())->surface());
+//       } else {
+//         propagated = propagator->propagate(updated, state.tracker->idToDet((*seedHits[ih]).geographicalId())->surface());
+//       }
+//       if (!propagated.isValid()) {
+//         std::cout << "Processing triplet "  << ", hit " << ih << ": failed propagation." << std::endl;
+//         fail = true;
+//         break;
+//       } else {
+//           std::cout << "Processing triplet "  << ", hit " << ih << ": propagated state = " << propagated;
+//       }
+//       SeedingHitSet::ConstRecHitPointer tthp = seedHits[ih];
+//       auto newtth = static_cast<SeedingHitSet::RecHitPointer>(state.cloner(*tthp, propagated));
+//       updated = state.theUpdator->update(propagated, *newtth);
+//       hits.push_back(newtth);
+//       if (!updated.isValid()) {
+//           std::cout << "Processing triplet "  << ", hit " << ih << ": failed update." << std::endl;
+//         fail = true;
+//         break;
+//       } else {
+//           std::cout << "Processing triplet "  << ", hit " << ih << ": updated state = " << updated;
+//       }
+//     }
+//     if (!fail && updated.isValid() && (updated.globalMomentum().perp() < 2.5)) {
+//         // std::cout << "Processing triplet "  << ": failed for final pt " << updated.globalMomentum().perp() << " < 2.5"
+//         //           << std::endl;
+//       fail = true;
+//     }
+//     if (!fail && updated.isValid() && (updated.globalMomentum().mag() < 2.5)) {
+//         // std::cout << "Processing triplet "  << ": failed for final p " << updated.globalMomentum().perp() << " < 2.5"
+//         //            << std::endl;
+//       fail = true;
+//     }
+//     if (fail) return false; 
+//     if (!fail) {
+//         // if (seedVerbosity_ > 2) {
+//         //   std::cout << "Processing triplet "  << ", rescale error by " << rescaleError_
+//         //             << ": state BEFORE rescaling " << updated;
+//         //   std::cout << "    Cartesian error (X,P) before rescaling= \n"
+//         //             << updated.cartesianError().matrix() << std::endl;
+//         // }
+//         updated.rescaleError(100);
+//       }
+//       // if (seedVerbosity_ > 0) {
+//       std::cout << "Processed  triplet "  << ": success (saved as #" << output.size() << ") : " << top << " + "
+//                 << middle << " + " << bottom << std::endl;
+//       // std::cout << "    pt = " << updated.globalMomentum().perp() << "    eta = " << updated.globalMomentum().eta()
+//                 // << "    phi = " << updated.globalMomentum().phi() << "    ch = " << updated.charge() << std::endl;
+//       // if (seedVerbosity_ > 1) {
+//         // std::cout << "    State:" << updated;
+//       // } else {
+//       //   std::cout << "    X  = " << updated.globalPosition() << ", P = " << updated.globalMomentum() << std::endl;
+//       // }
+//       // std::cout << "    Cartesian error (X,P) = \n" << updated.cartesianError().matrix() << std::endl;
+//     // }
+
+//     PTrajectoryStateOnDet const &PTraj = trajectoryStateTransform::persistentState(
+//         // updated, (*(seedOnMiddle_ ? trip.middle() : trip.inner())).geographicalId().rawId());
+//         updated, hits.back().geographicalId().rawId());
+//     // output.push_back(TrajectorySeed(PTraj, hits, ((bottom.y() - inner.y() > 0) ? alongMomentum : oppositeToMomentum)));
+//     output.push_back(TrajectorySeed(PTraj, hits, oppositeToMomentum));
+//     if (output.size() > size_t(50)) {
+//       output.clear();
+//       edm::LogError("TooManySeeds") << "Found too many seeds, bailing out.\n";
+//       return false;
+//     }
+//     return true;
+
+// }
+
 /// fit of a single triplet into a trajectory seed 
 bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletSeederEventState & state, const CosmicGridTripletSeeder::protoSeed& triplet, TrajectorySeedCollection & output){
   typedef TrajectoryStateOnSurface TSOS;
@@ -282,28 +434,28 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
     OrderedHitTriplet trip = triplet;  
 
 
-    GlobalPoint inner =
+    GlobalPoint top =
         state.tracker->idToDet((*(trip.inner())).geographicalId())->surface().toGlobal((*(trip.inner())).localPosition());
 
     GlobalPoint middle =
         state.tracker->idToDet((*(trip.middle())).geographicalId())->surface().toGlobal((*(trip.middle())).localPosition());
 
-    GlobalPoint outer =
+    GlobalPoint bottom =
         state.tracker->idToDet((*(trip.outer())).geographicalId())->surface().toGlobal((*(trip.outer())).localPosition());
 
     // std::cout << "Processing triplet " << ": " << inner << " + " << middle << " + " << outer << std::endl;
 
-    if ((outer.y() - inner.y()) * outer.y() < 0) {
-      std::swap(inner, outer);
+    if ((bottom.y() - top.y()) * bottom.y() < 0) {
+      std::swap(top, bottom);
       trip = OrderedHitTriplet(trip.outer(), trip.middle(), trip.inner());
 
         // std::cout << "The seed was going away from CMS! swapped in <-> out" << std::endl;
-        // std::cout << "Processing swapped triplet  : " << inner << " + " << middle << " + " << outer
+        // std::cout << "Processing swapped triplet  : " << top << " + " << middle << " + " << outer
                   // << std::endl;
     }
 
     // First use FastHelix out of the box
-    std::pair<GlobalVector, int> pq = pqFromHelixFit(inner, middle, outer, state.magfield);
+    std::pair<GlobalVector, int> pq = pqFromHelixFit(top, middle, bottom, state.magfield);
     GlobalVector gv = pq.first;
     float ch = pq.second;
     float Mom = sqrt(gv.x() * gv.x() + gv.y() * gv.y() + gv.z() * gv.z());
@@ -320,7 +472,7 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
     }
 
     const Propagator *propagator = nullptr;
-    if ((outer.y() - inner.y()) > 0) {
+    if ((bottom.y() - top.y()) > 0) {
         // std::cout << "Processing triplet " << ":  downgoing." << std::endl;
       propagator = state.thePropagatorAl.get();
     } else {
@@ -330,28 +482,62 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
         // std::cout << "Processing triplet " << ":  upgoing." << std::endl;
     }
 
-    if ((gv.z() * (outer.z() - inner.z()) > 0) && (fabs(outer.z() - inner.z()) > 5) && (fabs(gv.z()) > .01)) {
-      // std::cout << "ORRORE: outer.z()-inner.z() = " << (outer.z() - inner.z()) << ", gv.z() = " << gv.z()
+    if ((gv.z() * (bottom.z() - top.z()) > 0) && (fabs(bottom.z() - top.z()) > 5) && (fabs(gv.z()) > .01)) {
+      // std::cout << "ORRORE: outer.z()-top.z() = " << (outer.z() - top.z()) << ", gv.z() = " << gv.z()
       //           << std::endl;
     }
 
-    GlobalTrajectoryParameters Gtp(outer, gv, int(ch), state.magfield);
-    FreeTrajectoryState CosmicSeed(Gtp, CurvilinearTrajectoryError(AlgebraicSymMatrix55(AlgebraicMatrixID())));
-    CosmicSeed.rescaleError(100);
+    // GlobalTrajectoryParameters Gtp(bottom, gv, int(ch), state.magfield);
+    // FreeTrajectoryState CosmicSeed(Gtp, CurvilinearTrajectoryError(AlgebraicSymMatrix55(AlgebraicMatrixID())));
+    // CosmicSeed.rescaleError(100);
     // std::cout << "Processing triplet " << ". start from " << std::endl;
     // std::cout << "    X  = " << outer << ", P = " << gv << std::endl;
     // std::cout << "    Cartesian error (X,P) = \n" << CosmicSeed.cartesianError().matrix() << std::endl;
 
     edm::OwnVector<TrackingRecHit> hits;
-    OrderedHitTriplet seedHits(trip.outer(), trip.middle(), trip.inner());
+    std::vector<const BaseTrackerRecHit*> seedHits;
+    for (const BaseTrackerRecHit* hit : {trip.outer(), trip.middle(), trip.inner()}){
+      const VectorHit* vh = dynamic_cast<const VectorHit*>(hit);
+      if (vh){
+        auto found = state.vhConstituents.find(vh);
+        if (found != state.vhConstituents.end()){
+          for (auto & component : found->second){
+            seedHits.push_back(component);
+          }
+        }
+      }
+      else{
+        seedHits.push_back(hit);
+        // std::cout <<"         "<< seedHits.back()->globalPosition().y()<< std::endl; 
+      }
+    }
+    std::sort(seedHits.begin(),seedHits.end(),[&](const BaseTrackerRecHit* h1, const BaseTrackerRecHit* h2){
+      if (bottom.y() > 0 ){
+        return h1->globalPosition().y() > h2->globalPosition().y();
+      }
+      else{
+        return h1->globalPosition().y() < h2->globalPosition().y();
+      }
+    }); 
+    bottom = seedHits.front()->globalPosition(); 
+    GlobalTrajectoryParameters Gtp(bottom, gv, int(ch), state.magfield);
+    FreeTrajectoryState CosmicSeed(Gtp, CurvilinearTrajectoryError(AlgebraicSymMatrix55(AlgebraicMatrixID())));
+    CosmicSeed.rescaleError(100);
+    // std::cout << " start prop for seed "<<std::endl; 
+    // for (const BaseTrackerRecHit* hit : seedHits){
+      // std::cout << "  "<<hit->globalPosition()<< std::endl;
+    // }
+    // std::cout << " start prop from "<<bottom << std::endl ;
+      
     TSOS propagated, updated;
     bool fail = false;
-    for (size_t ih = 0; ih < 3; ++ih) {
+    for (size_t ih = 0; ih < seedHits.size(); ++ih) {
       // if ((ih == 2) && seedOnMiddle_) {
       //   if (seedVerbosity_ > 2)
       //     std::cout << "Stopping at middle hit, as requested." << std::endl;
       //   break;
       // }
+      // std::cout <<" about to prop from "<<CosmicSeed.position()<<" to "<<state.tracker->idToDet((*seedHits[ih]).geographicalId())->surface().position()<<" with momentum "<<CosmicSeed.momentum()<<std::endl;
       if (ih == 0) {
         propagated = propagator->propagate(CosmicSeed, state.tracker->idToDet((*seedHits[ih]).geographicalId())->surface());
       } else {
@@ -394,11 +580,11 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
         //   std::cout << "    Cartesian error (X,P) before rescaling= \n"
         //             << updated.cartesianError().matrix() << std::endl;
         // }
-        // updated.rescaleError(rescaleError_);
+        // updated.rescaleError(100);
       // }
       // if (seedVerbosity_ > 0) {
-      // std::cout << "Processed  triplet "  << ": success (saved as #" << out.size() << ") : " << inner << " + "
-                // << middle << " + " << outer << std::endl;
+      // std::cout << "Processed  triplet "  << ": success (saved as #" << out.size() << ") : " << top << " + "
+                // << middle << " + " << bottom << std::endl;
       // std::cout << "    pt = " << updated.globalMomentum().perp() << "    eta = " << updated.globalMomentum().eta()
                 // << "    phi = " << updated.globalMomentum().phi() << "    ch = " << updated.charge() << std::endl;
       // if (seedVerbosity_ > 1) {
@@ -411,8 +597,9 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
 
     PTrajectoryStateOnDet const &PTraj = trajectoryStateTransform::persistentState(
         // updated, (*(seedOnMiddle_ ? trip.middle() : trip.inner())).geographicalId().rawId());
-        updated, (*trip.inner()).geographicalId().rawId());
-    output.push_back(TrajectorySeed(PTraj, hits, ((outer.y() - inner.y() > 0) ? alongMomentum : oppositeToMomentum)));
+        updated, hits.back().geographicalId().rawId());
+    output.push_back(TrajectorySeed(PTraj, hits, ((bottom.y() - top.y() > 0) ? alongMomentum : oppositeToMomentum)));
+    // output.push_back(TrajectorySeed(PTraj, hits, ((bottom.y() - inner.y() > 0) ? alongMomentum : oppositeToMomentum))));
     if (output.size() > size_t(50)) {
       output.clear();
       edm::LogError("TooManySeeds") << "Found too many seeds, bailing out.\n";

@@ -49,7 +49,7 @@ trackerCosmicsTask = cms.Task(offlineBeamSpot,trackerlocalrecoTask,MeasurementTr
 
 # ugly hack: for the time being remove tracking (no Cosmics seeding in Phase-2) 
 from Configuration.Eras.Modifier_phase2_tracker_cff import phase2_tracker
-phase2_tracker.toReplaceWith(trackerCosmicsTask,trackerCosmicsTask.copyAndExclude([tracksP5Task]))
+# phase2_tracker.toReplaceWith(trackerCosmicsTask,trackerCosmicsTask.copyAndExclude([tracksP5Task]))
 
 trackerCosmics = cms.Sequence(trackerCosmicsTask)
 caloCosmicsTask = cms.Task(calolocalrecoTaskCosmics,ecalClustersCosmicsTask)
