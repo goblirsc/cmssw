@@ -9,6 +9,8 @@
 #include "DataFormats/GeometryVector/interface/GlobalPoint.h"
 #include "DataFormats/GeometryVector/interface/GlobalVector.h"
 #include "DataFormats/TrackerRecHit2D/interface/BaseTrackerRecHit.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiStripMatchedRecHit2DCollection.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiStripRecHit2DCollection.h"
 #include "DataFormats/TrackerRecHit2D/interface/VectorHit2D.h"
 #include "DataFormats/TrackingRecHit/interface/TrackingRecHit.h"
 #include "DataFormats/TrajectorySeed/interface/TrajectorySeed.h"
@@ -184,6 +186,9 @@ private:
      
     edm::EDGetTokenT<VectorHitCollection> vectorHitsToken_;  // vector hit collection
     edm::EDGetTokenT<Phase2TrackerRecHit1DCollectionNew> otRecHitsToken_;  // strip hits in the outer tracker
+    edm::EDGetTokenT<SiStripMatchedRecHit2DCollection> matchedStripHitsToken_;
+    edm::EDGetTokenT<SiStripRecHit2DCollection> rPhiHitsToken_;
+    // edm::EDGetTokenT<SiStripRecHit2DCollection> stereoHitsToken_;  // strip hits in the outer tracker
     edm::EDGetTokenT<SiPixelRecHitCollection> pixelRecHitsToken_;   // pixel hits
 
     /// condition dependencies 
@@ -195,6 +200,10 @@ private:
 
     /// tools 
     const edm::ESGetToken<TransientTrackingRecHitBuilder, TransientRecHitRecord> ttrhBuilderToken_;
+
+    int m_nGridX = 1;
+    int m_nGridY = 1;
+    int m_nGridZ = 1;
 
 
 };

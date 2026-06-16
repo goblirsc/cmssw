@@ -7,5 +7,8 @@ cosmicGridTripletSeeds = cosmicGridTripletSeeder.clone(
    PixelRecHits = cms.untracked.InputTag("siPixelRecHits"),
    TTRHBuilder = cms.string('WithTrackAngle'),
    MagneticFieldRecord = cms.ESInputTag('', ''),
+   nGridX = cms.int32(1),
+   nGridY = cms.int32(1),
+   nGridZ = cms.int32(1)
 )
 

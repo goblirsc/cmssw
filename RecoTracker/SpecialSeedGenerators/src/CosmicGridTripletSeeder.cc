@@ -7,13 +7,18 @@
 #include <cmath>
 #include <memory>
 #include <set>
+#include "DataFormats/Common/interface/OwnVector.h"
 #include "DataFormats/GeometryVector/interface/GlobalPoint.h"
 #include "DataFormats/GeometryVector/interface/GlobalVector.h"
+#include "DataFormats/SiStripDetId/interface/SiStripEnums.h"
+#include "DataFormats/TrackerRecHit2D/interface/BaseTrackerRecHit.h"
 #include "DataFormats/TrackerRecHit2D/interface/Phase2TrackerRecHit1D.h"
+#include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"
 #include "DataFormats/TrackerRecHit2D/interface/VectorHit.h"
 #include "DataFormats/TrackingRecHit/interface/TrackingRecHit.h"
 #include "FWCore/Utilities/interface/ESInputTag.h"
 #include "FWCore/Utilities/interface/isFinite.h"
+#include "Geometry/CommonTopologies/interface/GeomDetEnumerators.h"
 #include "MagneticField/Engine/interface/MagneticField.h"
 #include "RecoTracker/TkSeedGenerator/interface/FastHelix.h"
 #include "RecoTracker/TkSeedingLayers/interface/SeedingHitSet.h"
@@ -24,22 +29,36 @@
  
 
 CosmicGridTripletSeeder::CosmicGridTripletSeeder(const edm::ParameterSet& iConfig)
-    : vectorHitsToken_(consumes<VectorHitCollection>(iConfig.getUntrackedParameter<edm::InputTag>("vectorHits"))),
-      otRecHitsToken_(consumes(iConfig.getUntrackedParameter<edm::InputTag>("OTRecHits"))),
+    : vectorHitsToken_(mayConsume<VectorHitCollection>(iConfig.getUntrackedParameter<edm::InputTag>("vectorHits"))),
+      otRecHitsToken_(mayConsume<Phase2TrackerRecHit1DCollectionNew>(iConfig.getUntrackedParameter<edm::InputTag>("OTRecHits"))),
+      matchedStripHitsToken_(mayConsume<SiStripMatchedRecHit2DCollection>(iConfig.getUntrackedParameter<edm::InputTag>("matchedStripHits"))),
+      rPhiHitsToken_(mayConsume<SiStripRecHit2DCollection>(iConfig.getUntrackedParameter<edm::InputTag>("rPhiHits"))),
+      // stereoHitsToken_(mayConsume<SiStripRecHit2DCollection>(iConfig.getUntrackedParameter<edm::InputTag>("stereoHits"))),
       pixelRecHitsToken_(consumes(iConfig.getUntrackedParameter<edm::InputTag>("PixelRecHits"))),
       magfieldToken_(esConsumes(iConfig.getParameter<edm::ESInputTag>("MagneticFieldRecord"))),
       trackerToken_(esConsumes()),
-      ttrhBuilderToken_(esConsumes(edm::ESInputTag("", iConfig.getParameter<std::string>("TTRHBuilder")))) {
+      ttrhBuilderToken_(esConsumes(edm::ESInputTag("", iConfig.getParameter<std::string>("TTRHBuilder")))),
+      m_nGridX(iConfig.getParameter<int>("nGridX")),
+      m_nGridY(iConfig.getParameter<int>("nGridY")),
+      m_nGridZ(iConfig.getParameter<int>("nGridZ")) {
   produces<TrajectorySeedCollection>();
+  produces<edm::OwnVector<TrackingRecHit>>();
+
 }
 
 void CosmicGridTripletSeeder::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   desc.addUntracked<edm::InputTag>("vectorHits", edm::InputTag("siPhase2VectorHits:accepted"));
   desc.addUntracked<edm::InputTag>("OTRecHits", edm::InputTag("Phase2TrackerRecHits"));
+  desc.addUntracked<edm::InputTag>("matchedStripHits", edm::InputTag("siStripMatchedRecHits","matchedRecHit"));
+  desc.addUntracked<edm::InputTag>("rPhiHits", edm::InputTag("siStripMatchedRecHits","rphiRecHit"));
+  // desc.addUntracked<edm::InputTag>("stereoHits", edm::InputTag("siStripMatchedRecHits","matchedRecHit"));
   desc.addUntracked<edm::InputTag>("PixelRecHits", edm::InputTag("siPixelRecHits"));
   desc.add<std::string>("TTRHBuilder", "WithTrackAngle");
   desc.add<edm::ESInputTag>("MagneticFieldRecord", edm::ESInputTag("", ""));
+  desc.add<int>("nGridX",1);
+  desc.add<int>("nGridY",1);
+  desc.add<int>("nGridZ",1);
   descriptions.addWithDefaultLabel(desc);
 }
 
@@ -94,7 +113,8 @@ CosmicGridTripletSeeder::TripletSeederEventState CosmicGridTripletSeeder::initEv
   auto magfield = &c.getData(magfieldToken_);
   auto tracker = &c.getData(trackerToken_);
   auto cloner = dynamic_cast<TkTransientTrackingRecHitBuilder const&>(c.getData(ttrhBuilderToken_)).cloner();
-  return TripletSeederEventState{SeedingGrid{8, -120., 120., 6, -120., 120., 8, -280., 280.},
+
+  return TripletSeederEventState{SeedingGrid{m_nGridX, -120., 120., m_nGridY, -120., 120., m_nGridZ, -280., 280.},
                                  {},
                                  magfield,
                                  tracker,
@@ -120,56 +140,119 @@ void CosmicGridTripletSeeder::produce(edm::Event& e, const edm::EventSetup& c) {
 
   // book the trajectory seed collection
   auto output = std::make_unique<TrajectorySeedCollection>();
+  auto outtriplets = std::make_unique<edm::OwnVector<TrackingRecHit>>();
 
   // and fit the triplets
   fitTriplets(state, triplets, *output);
 
+  for (auto & trip : triplets){
+    outtriplets->push_back(trip.inner()->cloneHit()); 
+    outtriplets->push_back(trip.middle()->cloneHit()); 
+    outtriplets->push_back(trip.outer()->cloneHit()); 
+  }
+
   // put our output on the store
   e.put(std::move(output));
+  e.put(std::move(outtriplets));
 }
 
 bool CosmicGridTripletSeeder::populateGrid(const edm::Event& iEvent, CosmicGridTripletSeeder::TripletSeederEventState & state){
-  const auto & otHitCollection = iEvent.get(otRecHitsToken_); 
-  const auto & pixelHitCollection = iEvent.get(pixelRecHitsToken_); 
-  const auto & vectorHits = iEvent.get(vectorHitsToken_); 
+  edm::Handle<VectorHitCollection> vectorHits; 
+  edm::Handle<Phase2TrackerRecHit1DCollectionNew> otHitCollection; 
+  edm::Handle<SiStripMatchedRecHit2DCollection> matchedStripHits; 
+  edm::Handle<SiStripRecHit2DCollection> rPhiStripHits; 
+
+  bool hasOT = iEvent.getByToken(otRecHitsToken_, otHitCollection );
+  bool hasVec = iEvent.getByToken(vectorHitsToken_, vectorHits );
+  bool hasMatchedStrips = iEvent.getByToken(matchedStripHitsToken_, matchedStripHits );
+  bool hasRphiStrips = iEvent.getByToken(rPhiHitsToken_, rPhiStripHits );
+
+  const SiPixelRecHitCollection & pixelHitCollection = iEvent.get(pixelRecHitsToken_);
 
   std::set<const TrackingRecHit*> recHitsSeen{}; 
   std::vector<const VectorHit*> vhSeen{}; 
   /// step 1: Add the vector hits, and remember all raw hits associated to them 
-  for (auto  ds : vectorHits){
-      for (const VectorHit & vh : ds){
-        state.grid.addHit(&vh); 
-        vhSeen.push_back(&vh); 
-      }
+  if (hasVec){
+    for (auto  ds : *vectorHits){
+        for (const VectorHit & vh : ds){
+          // endcap vector hits have invalid directional information, 
+          // hence we skip these. 
+          if (state.tracker->idToDet(vh.geographicalId())->subDetector() == GeomDetEnumerators::SubDetector::P2OTEC){
+            continue; 
+          }
+          state.grid.addHit(&vh); 
+          vhSeen.push_back(&vh); 
+        }
+    }
   }
-  // std::cout << " CGS: Done adding vector hits, now have "<<vhSeen.size()<<" unique hits"<< std::endl; 
-  /// step 2: Add remaining OT hits, excluding those already on vector hits 
-  for (auto  ds : otHitCollection){
-      for (const Phase2TrackerRecHit1D & otHit : ds){
+  if (hasOT){
+    /// step 2: Add remaining OT hits, excluding those already on vector hits 
+    for (auto  ds : *otHitCollection){
+        for (const auto & otHit : ds){
+          bool unique = true; 
+          for (const auto* vh : vhSeen){
+              if (vh->sharesInput(&otHit,TrackingRecHit::some)){
+                  unique = false; 
+                  state.vhConstituents[vh].push_back(&otHit);
+                  break; 
+              }
+          }
+          if (!unique){
+              continue; 
+          }
+          state.grid.addHit(&otHit); 
+          recHitsSeen.insert(&otHit); 
+        }
+    }
+  }
+  /// phase-1 matched strip hits
+  if (hasMatchedStrips){
+    for (auto  ds : *matchedStripHits){
+      for (const auto & stripHit : ds){
         bool unique = true; 
         for (const auto* vh : vhSeen){
-            if (vh->sharesInput(&otHit,TrackingRecHit::some)){
+            if (vh->sharesInput(&stripHit,TrackingRecHit::some)){
                 unique = false; 
-                state.vhConstituents[vh].push_back(&otHit);
+                state.vhConstituents[vh].push_back(&stripHit);
                 break; 
             }
         }
         if (!unique){
-            // std::cout << " skip a hit overlapping with VH" << std::endl; 
             continue; 
         }
-        state.grid.addHit(&otHit); 
-        recHitsSeen.insert(&otHit); 
+        state.grid.addHit(&stripHit); 
+        recHitsSeen.insert(&stripHit); 
       }
+    }
+  } 
+
+  // phase-1 rphi strip hits 
+  if (hasRphiStrips){
+    for (auto  ds : *rPhiStripHits){
+      for (const auto & stripHit : ds){
+        bool unique = true; 
+        for (const auto* vh : vhSeen){
+            if (vh->sharesInput(&stripHit,TrackingRecHit::some)){
+                unique = false; 
+                state.vhConstituents[vh].push_back(&stripHit);
+                break; 
+            }
+        }
+        if (!unique){
+            continue; 
+        }
+        state.grid.addHit(&stripHit); 
+        recHitsSeen.insert(&stripHit); 
+      }
+    }
   }
-  // std::cout << " CGS: Done adding strip hits, now have "<<recHitsSeen.size() + vhSeen.size()<<" unique hits"<< std::endl; 
+
   /// step 3: Add pixel hits if desired  
   for (auto  ds : pixelHitCollection){
-      for (const SiPixelRecHit & pix : ds){
+      for (const auto & pix : ds){
         state.grid.addHit(&pix); 
       }
   }
-  // std::cout << " CGS: Done adding pixel hits, now have "<<recHitsSeen.size()<<" unique hits"<< std::endl; 
 
   // now sort all bins of the grid by ascending global y.
   state.grid.sort(); 
@@ -181,7 +264,7 @@ bool CosmicGridTripletSeeder::populateGrid(const edm::Event& iEvent, CosmicGridT
 bool CosmicGridTripletSeeder::formTriplets(const CosmicGridTripletSeeder::TripletSeederEventState & state, std::vector<CosmicGridTripletSeeder::protoSeed> & found){
     std::unordered_multiset<const BaseTrackerRecHit*> trackUsage; 
     // loop downwards over the starting y bin, top to bottom 
-    for (int yBin = state.grid.nBinsY()-1; yBin >0 ; --yBin){
+    for (int yBin = state.grid.nBinsY()-1; yBin >=0 ; --yBin){
       // loop rectangularily over the x-z grid 
       for (int xBin = 0; xBin < state.grid.nBinsX(); ++xBin){
         for (int zBin = 0; zBin < state.grid.nBinsZ(); ++zBin){
@@ -191,7 +274,6 @@ bool CosmicGridTripletSeeder::formTriplets(const CosmicGridTripletSeeder::Triple
         }
       }
     }
-    // std::cout << " found "<<found.size()<<" new triplets "<< std::endl;
     return true; 
 }
 
@@ -205,8 +287,11 @@ void CosmicGridTripletSeeder::formTriplets(int xBin,
 
   const auto& topHits = grid.getHits(xBin, yBin, zBin);
   // top to bottom navigation: Check a 3x3 grid for the next hit in the chain
-  if (yBin == 0)
-    return;
+  // if (yBin  0)
+    // return;
+
+  std::vector<const BaseTrackerRecHit *> hitCands; 
+  hitCands.insert(hitCands.end(),topHits.begin(), topHits.end() ); 
 
   for (int dxCenter = -1; dxCenter < 2; ++dxCenter) {
     if (xBin + dxCenter < 0 || xBin + dxCenter >= grid.nBinsX())
@@ -214,28 +299,33 @@ void CosmicGridTripletSeeder::formTriplets(int xBin,
     for (int dzCenter = -1; dzCenter < 2; ++dzCenter) {
       if (zBin + dzCenter < 0 || zBin + dzCenter >= grid.nBinsZ())
         continue;
-      const auto& middleHits = grid.getHits(xBin + dxCenter, yBin - 1, zBin + dzCenter);
-      formTriplets(topHits, topHits, middleHits, state, found, trackUsage);
-      formTriplets(topHits, middleHits, middleHits, state, found, trackUsage);
-
-      if (yBin == 1)
-        continue;
-      for (int dxBottom = -1; dxBottom < 2; ++dxBottom) {
-        if (xBin + dxCenter + dxBottom < 0 || xBin + dxCenter + dxBottom >= grid.nBinsX())
-          continue;
-        if ((dxCenter < 0 && dxBottom > 0) || (dxCenter > 0 && dxBottom < 0))
-          continue;
-        for (int dzBottom = -1; dzBottom < 2; ++dzBottom) {
-          if (zBin + dzCenter + dzBottom < 0 || zBin + dzCenter + dzBottom >= grid.nBinsZ())
-            continue;
-          if ((dzCenter < 0 && dzBottom > 0) || (dzCenter > 0 && dzBottom < 0))
-            continue;
-          const auto& bottomHits = grid.getHits(xBin + dxCenter + dxBottom, yBin - 2, zBin + dzCenter + dzBottom);
-          formTriplets(topHits, middleHits, bottomHits, state, found, trackUsage);
-        }
+      // formTriplets(topHits, topHits, topHits, state, found, trackUsage);
+      if (yBin > 0){
+        const auto& middleHits = grid.getHits(xBin + dxCenter, yBin - 1, zBin + dzCenter);
+        hitCands.insert(hitCands.end(),middleHits.begin(), middleHits.end() ); 
+        // // formTriplets(topHits, topHits, middleHits, state, found, trackUsage);
+        // // formTriplets(topHits, middleHits, middleHits, state, found, trackUsage);
+        // for (int dxBottom = -1; dxBottom < 2; ++dxBottom) {
+        //   if (xBin + dxCenter + dxBottom < 0 || xBin + dxCenter + dxBottom >= grid.nBinsX())
+        //     continue;
+        //   if ((dxCenter < 0 && dxBottom > 0) || (dxCenter > 0 && dxBottom < 0))
+        //     continue;
+        //   for (int dzBottom = -1; dzBottom < 2; ++dzBottom) {
+        //     if (zBin + dzCenter + dzBottom < 0 || zBin + dzCenter + dzBottom >= grid.nBinsZ())
+        //       continue;
+        //     if ((dzCenter < 0 && dzBottom > 0) || (dzCenter > 0 && dzBottom < 0))
+        //       continue;
+        //     if (yBin > 1){
+        //       const auto& bottomHits = grid.getHits(xBin + dxCenter + dxBottom, yBin - 2, zBin + dzCenter + dzBottom);
+        //       formTriplets(topHits, middleHits, bottomHits, state, found, trackUsage);
+        //     }
+        //   }
+        // }
       }
     }
   }
+  std::sort(hitCands.begin(),hitCands.end(),[](const BaseTrackerRecHit* h1, const BaseTrackerRecHit* h2){return h1->globalPosition().y() < h2->globalPosition().y(); });
+  formTriplets(hitCands, hitCands, hitCands, state, found, trackUsage);
 }
 
      /// get the triplets for one particular cell combination
@@ -247,16 +337,41 @@ void CosmicGridTripletSeeder::formTriplets(const std::vector<const BaseTrackerRe
                 std::unordered_multiset<const BaseTrackerRecHit*> & trackUsage){
 
   for (const BaseTrackerRecHit* top : topCands){
-    if (trackUsage.count(top) > 2) continue; 
+    if (trackUsage.count(top) > 12) continue; 
+    const auto & gTop = top->globalPosition(); 
     for (const BaseTrackerRecHit* center: centerCands){
-      if (trackUsage.count(center) > 2) continue; 
+      const auto & gCenter = center->globalPosition(); 
+      if (trackUsage.count(center) > 12) continue; 
       for (const BaseTrackerRecHit* bottom: bottomCands){
-        if (trackUsage.count(bottom) > 2) continue; 
+        const auto & gBottom = bottom->globalPosition(); 
+        if (trackUsage.count(bottom) > 12) continue; 
         if (center == top || top == bottom || center == bottom) continue; 
-        if (top->detUnit() == bottom->detUnit() || top->detUnit() == center->detUnit() || bottom->detUnit() == center->detUnit()) continue; 
-        if (center->globalPosition().y() > top->globalPosition().y()) continue;
-        if (bottom->globalPosition().y() > center->globalPosition().y()) continue;
-        if ((top->globalPosition().z() - center->globalPosition().z()) * (center->globalPosition().z() - bottom->globalPosition().z())  < 0) continue;
+        if (top->sameDetModule(*bottom) || top->sameDetModule(*center) || center->sameDetModule(*bottom)) continue; 
+        if (gCenter.y() > gTop.y()) continue;
+        if (gBottom.y() > gCenter.y()) continue;
+        // veto "zigzag" in z 
+        if ((gTop.z() - gCenter.z()) * (gCenter.z() - gBottom.z())  < 0 && std::abs(gTop.z() - gBottom.z() > 1.0)) continue;
+        // veto "zigzag" in x 
+        if ((gTop.x() - gCenter.x()) * (gCenter.x() - gBottom.x())  < 0 && std::abs(gTop.x() - gBottom.x() > 1.0)) continue;
+        const VectorHit* cenVH = dynamic_cast<const VectorHit*>(center); 
+        if (cenVH){
+          double dydx = 0.5 * ((gTop.y() - gCenter.y())/(gTop.x() - gCenter.x()) + (gCenter.y() - gBottom.y())/(gCenter.x() - gBottom.x())); 
+          double dydx_vh = cenVH->globalDirectionVH().y() / cenVH->globalDirectionVH().x();
+          std::cout << " dydx from trip "<<dydx<<" and from vh "<<dydx_vh<<std::endl; 
+        }
+        // try this:
+        // double dyz_top =  (gTop.z() - gCenter.z()) / (gTop.y() - gCenter.y());
+        // double dyz_bot =  (gCenter.z() - gBottom.z()) / (gCenter.y() - gBottom.y()); 
+        // double dyz_trip =  (gTop.z() - gBottom.z()) / (gTop.y() - gBottom.y()); 
+        // double dxy_top =  (gTop.x() - gCenter.x()) / (gTop.y() - gCenter.y());
+        // double dxy_bot =  (gCenter.x() - gBottom.x()) / (gCenter.y() - gBottom.y()); 
+        // double dxy_trip =  (gTop.x() - gBottom.x()) / (gTop.y() - gBottom.y()); 
+        // std::cout << " dyz_top "<<dyz_top<<" "<<" dyz_bottom " <<dyz_bot<< " dyz_trip "<<dyz_trip<< " dTrip " <<5.0 / std::abs((gTop.y() - gBottom.y()))<< std::endl; 
+        // std::cout << " dxy_top "<<dxy_top<<" "<<" dxy_bottom " <<dxy_bot<< " dxy_trip "<<dxy_trip<< std::endl; 
+        // if (std::abs(dxy_top - dxy_bot) > 0.5 * std::abs(dxy_trip)) continue;
+
+
+
         protoSeed ps (top, center, bottom);
         trackUsage.insert(top); 
         trackUsage.insert(center); 
@@ -274,157 +389,7 @@ bool CosmicGridTripletSeeder::fitTriplets(const CosmicGridTripletSeeder::Triplet
     // std::cout << " built "<<output.size()<<" seeds from "<<triplets.size()<<" triplets "<< std::endl; 
     return true; 
 }
-// /// fit of a single triplet into a trajectory seed 
-// bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletSeederEventState & state, const CosmicGridTripletSeeder::protoSeed& triplet, TrajectorySeedCollection & output){
-//   typedef TrajectoryStateOnSurface TSOS;
 
-
-//     OrderedHitTriplet trip = triplet;  
-
-
-//     GlobalPoint top =
-//         state.tracker->idToDet((*(trip.inner())).geographicalId())->surface().toGlobal((*(trip.inner())).localPosition());
-
-//     GlobalPoint middle =
-//         state.tracker->idToDet((*(trip.middle())).geographicalId())->surface().toGlobal((*(trip.middle())).localPosition());
-
-//     GlobalPoint bottom =
-//         state.tracker->idToDet((*(trip.outer())).geographicalId())->surface().toGlobal((*(trip.outer())).localPosition());
-
-//     // First use FastHelix out of the box
-//     std::pair<GlobalVector, int> pq = pqFromHelixFit(top, middle, bottom, state.magfield);
-//     GlobalVector gv = pq.first;
-//     float ch = pq.second;
-//     float Mom = sqrt(gv.x() * gv.x() + gv.y() * gv.y() + gv.z() * gv.z());
-
-//     if (Mom > 10000 || edm::isNotFinite(Mom)) {
-//         // std::cout << "Processing triplet " << ": fail for momentum." << std::endl;
-//       return false;
-//     }
-
-//     if (gv.perp() < 2.5) {
-//         // std::cout << "Processing triplet " << ": fail for pt = " << gv.perp() << " < ptMin = 2.5"
-//                   // << std::endl;
-//       return false;
-//     }
-
-//     const Propagator *propagator = state.thePropagatorOp.get();
-//     // } else {
-//     //   gv = -1 * gv;
-//     //   ch = -1. * ch;
-//     //   propagator = state.thePropagatorOp.get();
-//     //     // std::cout << "Processing triplet " << ":  upgoing." << std::endl;
-//     // }
-
-//     // if ((gv.z() * (bottom.z() - top.z()) > 0) && (fabs(bottom.z() - top.z()) > 5) && (fabs(gv.z()) > .01)) {
-//       // std::cout << "ORRORE: outer.z()-top.z() = " << (outer.z() - top.z()) << ", gv.z() = " << gv.z()
-//       //           << std::endl;
-//     // }
-
-//     GlobalTrajectoryParameters Gtp(bottom, gv, int(ch), state.magfield);
-//     FreeTrajectoryState CosmicSeed(Gtp, CurvilinearTrajectoryError(AlgebraicSymMatrix55(AlgebraicMatrixID())));
-//     CosmicSeed.rescaleError(100);
-//     // std::cout << "Processing triplet " << ". start from " << std::endl;
-//     // std::cout << "    X  = " << outer << ", P = " << gv << std::endl;
-//     // std::cout << "    Cartesian error (X,P) = \n" << CosmicSeed.cartesianError().matrix() << std::endl;
-
-//     edm::OwnVector<TrackingRecHit> hits;
-//     std::vector<const BaseTrackerRecHit*> seedHits;
-//     for (const BaseTrackerRecHit* hit : {trip.inner(), trip.middle(), trip.outer()}){
-//       const VectorHit* vh = dynamic_cast<const VectorHit*>(hit);
-//       if (vh){
-//         auto found = state.vhConstituents.find(vh);
-//         if (found != state.vhConstituents.end()){
-//           for (auto & component : found->second){
-//             seedHits.push_back(component);
-//           }
-//         }
-//       }
-//       else{
-//         seedHits.push_back(hit);
-//       }
-//     }
-//     std::sort(seedHits.begin(), seedHits.end(), [](const BaseTrackerRecHit* h1, const BaseTrackerRecHit* h2){return h1->globalPosition().y() > h2->globalPosition().y();}); 
-      
-//     TSOS propagated, updated;
-//     bool fail = false;
-//     for (size_t ih = 0; ih < seedHits.size(); ++ih) {
-//       // if ((ih == 2) && seedOnMiddle_) {
-//       //   if (seedVerbosity_ > 2)
-//       //     std::cout << "Stopping at middle hit, as requested." << std::endl;
-//       //   break;
-//       // }
-//       std::cout << " try to prop to "<<seedHits[ih]->globalPosition()<<std::endl; 
-//       if (ih == 0) {
-//         propagated = propagator->propagate(CosmicSeed, state.tracker->idToDet((*seedHits[ih]).geographicalId())->surface());
-//       } else {
-//         propagated = propagator->propagate(updated, state.tracker->idToDet((*seedHits[ih]).geographicalId())->surface());
-//       }
-//       if (!propagated.isValid()) {
-//         std::cout << "Processing triplet "  << ", hit " << ih << ": failed propagation." << std::endl;
-//         fail = true;
-//         break;
-//       } else {
-//           std::cout << "Processing triplet "  << ", hit " << ih << ": propagated state = " << propagated;
-//       }
-//       SeedingHitSet::ConstRecHitPointer tthp = seedHits[ih];
-//       auto newtth = static_cast<SeedingHitSet::RecHitPointer>(state.cloner(*tthp, propagated));
-//       updated = state.theUpdator->update(propagated, *newtth);
-//       hits.push_back(newtth);
-//       if (!updated.isValid()) {
-//           std::cout << "Processing triplet "  << ", hit " << ih << ": failed update." << std::endl;
-//         fail = true;
-//         break;
-//       } else {
-//           std::cout << "Processing triplet "  << ", hit " << ih << ": updated state = " << updated;
-//       }
-//     }
-//     if (!fail && updated.isValid() && (updated.globalMomentum().perp() < 2.5)) {
-//         // std::cout << "Processing triplet "  << ": failed for final pt " << updated.globalMomentum().perp() << " < 2.5"
-//         //           << std::endl;
-//       fail = true;
-//     }
-//     if (!fail && updated.isValid() && (updated.globalMomentum().mag() < 2.5)) {
-//         // std::cout << "Processing triplet "  << ": failed for final p " << updated.globalMomentum().perp() << " < 2.5"
-//         //            << std::endl;
-//       fail = true;
-//     }
-//     if (fail) return false; 
-//     if (!fail) {
-//         // if (seedVerbosity_ > 2) {
-//         //   std::cout << "Processing triplet "  << ", rescale error by " << rescaleError_
-//         //             << ": state BEFORE rescaling " << updated;
-//         //   std::cout << "    Cartesian error (X,P) before rescaling= \n"
-//         //             << updated.cartesianError().matrix() << std::endl;
-//         // }
-//         updated.rescaleError(100);
-//       }
-//       // if (seedVerbosity_ > 0) {
-//       std::cout << "Processed  triplet "  << ": success (saved as #" << output.size() << ") : " << top << " + "
-//                 << middle << " + " << bottom << std::endl;
-//       // std::cout << "    pt = " << updated.globalMomentum().perp() << "    eta = " << updated.globalMomentum().eta()
-//                 // << "    phi = " << updated.globalMomentum().phi() << "    ch = " << updated.charge() << std::endl;
-//       // if (seedVerbosity_ > 1) {
-//         // std::cout << "    State:" << updated;
-//       // } else {
-//       //   std::cout << "    X  = " << updated.globalPosition() << ", P = " << updated.globalMomentum() << std::endl;
-//       // }
-//       // std::cout << "    Cartesian error (X,P) = \n" << updated.cartesianError().matrix() << std::endl;
-//     // }
-
-//     PTrajectoryStateOnDet const &PTraj = trajectoryStateTransform::persistentState(
-//         // updated, (*(seedOnMiddle_ ? trip.middle() : trip.inner())).geographicalId().rawId());
-//         updated, hits.back().geographicalId().rawId());
-//     // output.push_back(TrajectorySeed(PTraj, hits, ((bottom.y() - inner.y() > 0) ? alongMomentum : oppositeToMomentum)));
-//     output.push_back(TrajectorySeed(PTraj, hits, oppositeToMomentum));
-//     if (output.size() > size_t(50)) {
-//       output.clear();
-//       edm::LogError("TooManySeeds") << "Found too many seeds, bailing out.\n";
-//       return false;
-//     }
-//     return true;
-
-// }
 
 /// fit of a single triplet into a trajectory seed 
 bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletSeederEventState & state, const CosmicGridTripletSeeder::protoSeed& triplet, TrajectorySeedCollection & output){
@@ -434,65 +399,50 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
     OrderedHitTriplet trip = triplet;  
 
 
-    GlobalPoint top =
+    GlobalPoint inner =
         state.tracker->idToDet((*(trip.inner())).geographicalId())->surface().toGlobal((*(trip.inner())).localPosition());
 
     GlobalPoint middle =
         state.tracker->idToDet((*(trip.middle())).geographicalId())->surface().toGlobal((*(trip.middle())).localPosition());
 
-    GlobalPoint bottom =
+    GlobalPoint outer =
         state.tracker->idToDet((*(trip.outer())).geographicalId())->surface().toGlobal((*(trip.outer())).localPosition());
 
-    // std::cout << "Processing triplet " << ": " << inner << " + " << middle << " + " << outer << std::endl;
-
-    if ((bottom.y() - top.y()) * bottom.y() < 0) {
-      std::swap(top, bottom);
+    if ((outer.y() - inner.y()) * outer.y() < 0) {
+      std::swap(inner, outer);
       trip = OrderedHitTriplet(trip.outer(), trip.middle(), trip.inner());
-
-        // std::cout << "The seed was going away from CMS! swapped in <-> out" << std::endl;
-        // std::cout << "Processing swapped triplet  : " << top << " + " << middle << " + " << outer
-                  // << std::endl;
     }
 
     // First use FastHelix out of the box
-    std::pair<GlobalVector, int> pq = pqFromHelixFit(top, middle, bottom, state.magfield);
+    std::pair<GlobalVector, int> pq = pqFromHelixFit(inner, middle, outer, state.magfield);
     GlobalVector gv = pq.first;
     float ch = pq.second;
     float Mom = sqrt(gv.x() * gv.x() + gv.y() * gv.y() + gv.z() * gv.z());
 
-    if (Mom > 10000 || edm::isNotFinite(Mom)) {
+    if (Mom > 1000000 || edm::isNotFinite(Mom)) {
         // std::cout << "Processing triplet " << ": fail for momentum." << std::endl;
       return false;
     }
 
-    if (gv.perp() < 2.5) {
+    if (gv.perp() < 0.5) {
         // std::cout << "Processing triplet " << ": fail for pt = " << gv.perp() << " < ptMin = 2.5"
                   // << std::endl;
       return false;
     }
 
     const Propagator *propagator = nullptr;
-    if ((bottom.y() - top.y()) > 0) {
+    if ((outer.y() - inner.y()) > 0) {
         // std::cout << "Processing triplet " << ":  downgoing." << std::endl;
       propagator = state.thePropagatorAl.get();
     } else {
       gv = -1 * gv;
       ch = -1. * ch;
       propagator = state.thePropagatorOp.get();
-        // std::cout << "Processing triplet " << ":  upgoing." << std::endl;
     }
 
-    if ((gv.z() * (bottom.z() - top.z()) > 0) && (fabs(bottom.z() - top.z()) > 5) && (fabs(gv.z()) > .01)) {
-      // std::cout << "ORRORE: outer.z()-top.z() = " << (outer.z() - top.z()) << ", gv.z() = " << gv.z()
-      //           << std::endl;
+    if ((gv.z() * (outer.z() - inner.z()) > 0) && (fabs(outer.z() - inner.z()) > 5) && (fabs(gv.z()) > .01)) {
     }
 
-    // GlobalTrajectoryParameters Gtp(bottom, gv, int(ch), state.magfield);
-    // FreeTrajectoryState CosmicSeed(Gtp, CurvilinearTrajectoryError(AlgebraicSymMatrix55(AlgebraicMatrixID())));
-    // CosmicSeed.rescaleError(100);
-    // std::cout << "Processing triplet " << ". start from " << std::endl;
-    // std::cout << "    X  = " << outer << ", P = " << gv << std::endl;
-    // std::cout << "    Cartesian error (X,P) = \n" << CosmicSeed.cartesianError().matrix() << std::endl;
 
     edm::OwnVector<TrackingRecHit> hits;
     std::vector<const BaseTrackerRecHit*> seedHits;
@@ -512,29 +462,28 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
       }
     }
     std::sort(seedHits.begin(),seedHits.end(),[&](const BaseTrackerRecHit* h1, const BaseTrackerRecHit* h2){
-      if (bottom.y() > 0 ){
+      if (outer.y() > 0 ){
         return h1->globalPosition().y() > h2->globalPosition().y();
       }
       else{
         return h1->globalPosition().y() < h2->globalPosition().y();
       }
     }); 
-    bottom = seedHits.front()->globalPosition(); 
-    GlobalTrajectoryParameters Gtp(bottom, gv, int(ch), state.magfield);
+    outer = seedHits.front()->globalPosition(); 
+    GlobalTrajectoryParameters Gtp(outer, gv, int(ch), state.magfield);
     FreeTrajectoryState CosmicSeed(Gtp, CurvilinearTrajectoryError(AlgebraicSymMatrix55(AlgebraicMatrixID())));
     CosmicSeed.rescaleError(100);
-    // std::cout << " start prop for seed "<<std::endl; 
-    // for (const BaseTrackerRecHit* hit : seedHits){
-      // std::cout << "  "<<hit->globalPosition()<< std::endl;
-    // }
-    // std::cout << " start prop from "<<bottom << std::endl ;
+    // std::cout << "Processing triplet " << ". start from " << std::endl;
+    // std::cout << "    X  = " << outer << ", P = " << gv << std::endl;
+    // std::cout << "    Cartesian error (X,P) = \n" << CosmicSeed.cartesianError().matrix() << std::endl;
+    // std::cout << " start prop from "<<outer << std::endl ;
       
     TSOS propagated, updated;
     bool fail = false;
     for (size_t ih = 0; ih < seedHits.size(); ++ih) {
       // if ((ih == 2) && seedOnMiddle_) {
       //   if (seedVerbosity_ > 2)
-      //     std::cout << "Stopping at middle hit, as requested." << std::endl;
+      //     std::cout << "Sinnerping at middle hit, as requested." << std::endl;
       //   break;
       // }
       // std::cout <<" about to prop from "<<CosmicSeed.position()<<" to "<<state.tracker->idToDet((*seedHits[ih]).geographicalId())->surface().position()<<" with momentum "<<CosmicSeed.momentum()<<std::endl;
@@ -548,7 +497,7 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
         fail = true;
         break;
       } else {
-          // std::cout << "Processing triplet "  << ", hit " << ih << ": propagated state = " << propagated;
+          // std::cout << "Processing triplet "  << ", hit " << ih << ": ok"<<std::endl;
       }
       SeedingHitSet::ConstRecHitPointer tthp = seedHits[ih];
       auto newtth = static_cast<SeedingHitSet::RecHitPointer>(state.cloner(*tthp, propagated));
@@ -559,17 +508,17 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
         fail = true;
         break;
       } else {
-          // std::cout << "Processing triplet "  << ", hit " << ih << ": updated state = " << updated;
+          // std::cout << "Processing triplet "  << ", hit " << ih << ": ok"<<std::endl; 
       }
     }
     if (!fail && updated.isValid() && (updated.globalMomentum().perp() < 2.5)) {
         // std::cout << "Processing triplet "  << ": failed for final pt " << updated.globalMomentum().perp() << " < 2.5"
-        //           << std::endl;
+                  // << std::endl;
       fail = true;
     }
     if (!fail && updated.isValid() && (updated.globalMomentum().mag() < 2.5)) {
         // std::cout << "Processing triplet "  << ": failed for final p " << updated.globalMomentum().perp() << " < 2.5"
-        //            << std::endl;
+                  //  << std::endl;
       fail = true;
     }
     if (fail) return false; 
@@ -582,25 +531,26 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
         // }
         // updated.rescaleError(100);
       // }
-      // if (seedVerbosity_ > 0) {
-      // std::cout << "Processed  triplet "  << ": success (saved as #" << out.size() << ") : " << top << " + "
-                // << middle << " + " << bottom << std::endl;
-      // std::cout << "    pt = " << updated.globalMomentum().perp() << "    eta = " << updated.globalMomentum().eta()
-                // << "    phi = " << updated.globalMomentum().phi() << "    ch = " << updated.charge() << std::endl;
-      // if (seedVerbosity_ > 1) {
-        // std::cout << "    State:" << updated;
-      // } else {
-      //   std::cout << "    X  = " << updated.globalPosition() << ", P = " << updated.globalMomentum() << std::endl;
-      // }
-      // std::cout << "    Cartesian error (X,P) = \n" << updated.cartesianError().matrix() << std::endl;
-    // }
+    //   if (true) {
+    //   std::cout << "Processed  triplet "  << ": success (saved as #" << output.size() << ") : " << inner << " + "
+    //             << middle << " + " << outer << std::endl;
+    //   std::cout << "    pt = " << updated.globalMomentum().perp() << "    eta = " << updated.globalMomentum().eta()
+    //             << "    phi = " << updated.globalMomentum().phi() << "    ch = " << updated.charge() << std::endl;
+    //   if (true) {
+    //     std::cout << "    State:" << updated;
+    //   } else {
+    //     std::cout << "    X  = " << updated.globalPosition() << ", P = " << updated.globalMomentum() << std::endl;
+    //   }
+    //   std::cout << "    Cartesian error (X,P) = \n" << updated.cartesianError().matrix() << std::endl;
+    // }   
 
     PTrajectoryStateOnDet const &PTraj = trajectoryStateTransform::persistentState(
-        // updated, (*(seedOnMiddle_ ? trip.middle() : trip.inner())).geographicalId().rawId());
         updated, hits.back().geographicalId().rawId());
-    output.push_back(TrajectorySeed(PTraj, hits, ((bottom.y() - top.y() > 0) ? alongMomentum : oppositeToMomentum)));
-    // output.push_back(TrajectorySeed(PTraj, hits, ((bottom.y() - inner.y() > 0) ? alongMomentum : oppositeToMomentum))));
-    if (output.size() > size_t(50)) {
+    // output.push_back(TrajectorySeed(PTraj, hits, ((outer.y() - inner.y() > 0) ? alongMomentum : oppositeToMomentum)));
+    output.push_back(TrajectorySeed(PTraj, hits, ((outer.y() - inner.y() > 0) ? alongMomentum : oppositeToMomentum)));
+
+    // std::cout <<"  Wrote seed at "<<state.tracker->idToDet(output.back().startingState().detId())->toGlobal(output.back().startingState().parameters().position())<<" in direction "<<(output.back().direction() == 0 ? "opposite" : "along")<<" with momentum direction "<<state.tracker->idToDet(output.back().startingState().detId())->toGlobal(output.back().startingState().parameters().momentum())<<std::endl;
+    if (output.size() > size_t(500)) {
       output.clear();
       edm::LogError("TooManySeeds") << "Found too many seeds, bailing out.\n";
       return false;
