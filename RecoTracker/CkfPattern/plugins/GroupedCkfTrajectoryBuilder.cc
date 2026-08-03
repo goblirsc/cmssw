@@ -279,8 +279,10 @@ void GroupedCkfTrajectoryBuilder::buildTrajectories(const TrajectorySeed& seed,
   work_.clear();
   const bool inOut = true;
   nCandPerSeed = groupedLimitedCandidates(seed, startingTraj, regionalCondition, forwardPropagator(seed), inOut, work_);
-  if (work_.empty())
+  if (work_.empty()){
+    LogDebug("CkfTrajectory")  << " Exit, did not find any trajectories "<< std::endl; 
     return;
+  }
 
   // cleaning now done here...
   FastTrajectoryCleaner cleaner(theFoundHitBonus, theLostHitPenalty);
@@ -340,6 +342,11 @@ void GroupedCkfTrajectoryBuilder::buildTrajectories(const TrajectorySeed& seed,
 #endif
 }
 
+void GroupedCkfTrajectoryBuilder::analyseResult(const TrajectoryContainer& result) const {
+  LogDebug("CkfPattern") << " Result analysis of "<<result.size()<<" Trajectories "<< std::endl;
+}
+
+
 unsigned int GroupedCkfTrajectoryBuilder::groupedLimitedCandidates(const TrajectorySeed& seed,
                                                                    TempTrajectory const& startingTraj,
                                                                    const TrajectoryFilter* regionalCondition,
@@ -353,15 +360,21 @@ unsigned int GroupedCkfTrajectoryBuilder::groupedLimitedCandidates(const Traject
   TempTrajectoryContainer newCand;
   newCand.reserve(theMaxCand);
   candidates.push_back(startingTraj);
+  LogDebug("CkfTrajectory")  << " Seed: "<< std::endl;
+  for (auto & hit : seed.recHits()){
+    LogDebug("CkfTrajectory")  << "       "<<hit.globalPosition()<< " / R "<<hit.globalPosition().perp()<< std::endl ; 
+  }
 
   while (!candidates.empty()) {
     newCand.clear();
     for (TempTrajectoryContainer::iterator traj = candidates.begin(); traj != candidates.end(); traj++) {
+      LogDebug("CkfTrajectory")  << " try a candidate "<< std::endl; 
       if (!advanceOneLayer(seed, *traj, regionalCondition, propagator, inOut, newCand, result)) {
+        LogDebug("CkfTrajectory")  << " advanceOneLayer FAILED" << std::endl; 
         LogDebug("CkfPattern") << "GCTB: terminating after advanceOneLayer==false";
         continue;
       }
-
+      LogDebug("CkfTrajectory")  << "advanceOneLayer OK "<<result.size()<< std::endl; 
       LogDebug("CkfPattern") << "newCand(1): after advanced one layer:\n" << PrintoutHelper::dumpCandidates(newCand);
       // account only new candidates, i.e.
       // - 1 candidate -> 1 candidate, don't increase count
@@ -381,6 +394,7 @@ unsigned int GroupedCkfTrajectoryBuilder::groupedLimitedCandidates(const Traject
       groupedIntermediaryClean(newCand);
 #endif
     }
+    LogDebug("CkfPattern") << "newCand.size() at end 2 = " << newCand.size();
     candidates.swap(newCand);
 
     LogDebug("CkfPattern") << "candidates(3): " << result.size() << " candidates after " << nIter++
@@ -412,6 +426,9 @@ std::string whatIsTheNextStep(TempTrajectory const& traj,
            << sfdl->specificSurface().phi() << endl;
   }
   buffer << "Trying to go to";
+  if (nl.empty()){
+    buffer << " --> nowhere to go to! "<< endl;
+  }
   for (vector<const DetLayer*>::iterator il = nl.begin(); il != nl.end(); il++) {
     //B.M. buffer << " " << layerName(*il)  << " " << *il << endl;
     const BarrelDetLayer* bdl = dynamic_cast<const BarrelDetLayer*>(*il);
@@ -475,7 +492,9 @@ bool GroupedCkfTrajectoryBuilder::advanceOneLayer(const TrajectorySeed& seed,
         stateAndLayers.second.push_back(traj.lastLayer());
     }
   }
-
+  if (stateAndLayers.second.empty()){
+    LogDebug("CkfTrajectory") << " nowhere to go to - will not do anything "<< std::endl; 
+  }
   auto layerBegin = stateAndLayers.second.begin();
   auto layerEnd = stateAndLayers.second.end();
 
@@ -671,8 +690,9 @@ bool GroupedCkfTrajectoryBuilder::advanceOneLayer(const TrajectorySeed& seed,
 
   if (!foundSegments) {
     LogDebug("CkfPattern") << "GCTB: adding input trajectory to result";
-    if (!stateAndLayers.second.empty())
+    if (!stateAndLayers.second.empty()){
       traj.setStopReason(StopReason::NO_SEGMENTS_FOR_VALID_LAYERS);
+    }
     addToResult(traj, result, inOut);
   }
   return foundNewCandidates;

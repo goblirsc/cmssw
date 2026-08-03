@@ -18,7 +18,7 @@
 class NavigationSchool {
 public:
   NavigationSchool() : theAllDetLayersInSystem(nullptr) {
-    //    std::cout << "NVSH: C "<< this << std::endl;
+    //    LogDebug("NaviSchool") << "NVSH: C "<< this << std::endl;
   }
 
   virtual ~NavigationSchool() {}
@@ -32,7 +32,9 @@ public:
   template <typename... Args>
   std::vector<const DetLayer*> nextLayers(const DetLayer& detLayer, Args&&... args) const {
     assert(detLayer.seqNum() >= 0);
-    auto nl = theAllNavigableLayer[detLayer.seqNum()];
+    auto nl = theAllNavigableLayer[detLayer.seqNum()];    
+    LogDebug("NaviSchool") << " nextLayers: theAllNavigableLayer "<<nl<< std::endl; 
+    if (nl) LogDebug("NaviSchool") << "   found "<<nl->nextLayers(std::forward<Args>(args)...).size()<<" next layers "<< std::endl; 
     return nl ? nl->nextLayers(std::forward<Args>(args)...) : std::vector<const DetLayer*>();
   }
 
@@ -40,12 +42,15 @@ public:
   template <typename... Args>
   std::vector<const DetLayer*> compatibleLayers(const DetLayer& detLayer, Args&&... args) const {
     auto nl = theAllNavigableLayer[detLayer.seqNum()];
+      LogDebug("NaviSchool") << " compatibleLayers: theAllNavigableLayer "<<nl<< std::endl; 
+    if (nl) LogDebug("NaviSchool") << "   found "<<nl->compatibleLayers(std::forward<Args>(args)...).size()<<" compatible layers "<< std::endl; 
+
     return nl ? nl->compatibleLayers(std::forward<Args>(args)...) : std::vector<const DetLayer*>();
   }
 
 protected:
   void setState(const StateType& state) {
-    //  std::cout << "NVSH: set "<< this << ' ' << typeid(*this).name()
+    //  LogDebug("NaviSchool") << "NVSH: set "<< this << ' ' << typeid(*this).name()
     //	      << ' ' << state.size() << ' ' << theAllNavigableLayer.size() << std::endl;
 
     for (auto nl : state) {

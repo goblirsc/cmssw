@@ -90,7 +90,7 @@ protected:
   void analyseSeed(const TrajectorySeed& seed) const {}
 
   void analyseMeasurements(const std::vector<TM>& meas, const Trajectory& traj) const {}
-  void analyseResult(const TrajectoryContainer& result) const {}
+  void analyseResult(const TrajectoryContainer& result) const;
 
 private:
   //  /// no copy constructor

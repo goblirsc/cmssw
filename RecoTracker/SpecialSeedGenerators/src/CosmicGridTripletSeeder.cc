@@ -187,6 +187,7 @@ void CosmicGridTripletSeeder::produce(edm::Event& e, const edm::EventSetup& c) {
     }
     e.put(std::move(outtriplets));
   }
+  std::cout << " ===== SEEDING DONE ====== "  << std::endl; 
 }
 
 void CosmicGridTripletSeeder::populateGrid(const edm::Event& iEvent,
@@ -513,6 +514,7 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
   // starting parameters: Lowest point, estimated momentum from fast helix.
   GlobalPoint updatedStartPos = seedHits.front()->globalPosition();
   GlobalTrajectoryParameters Gtp(updatedStartPos, gv, int(ch), state.magfield);
+
   FreeTrajectoryState CosmicSeed(Gtp, CurvilinearTrajectoryError(AlgebraicSymMatrix55(AlgebraicMatrixID())));
   CosmicSeed.rescaleError(100);
   TSOS propagated, updated;
@@ -525,16 +527,30 @@ bool CosmicGridTripletSeeder::fitTriplet(const CosmicGridTripletSeeder::TripletS
     } else {
       propagated = propagator->propagate(updated, state.tracker->idToDet((*seedHits[ih]).geographicalId())->surface());
     }
-    // Phase-2 can result in cases with a "valid" state that has NaN values in the momentum.
-    // This occurs in rare cases when all hits on the seed are on non-stereo 2S OT sensors.
-    // The KF can not use these, so we bail out as for invalid propagations.
+    // Phase-2 can result in cases with a "valid" state that has NaN values in the momentum. 
+    // This occurs in rare cases when all hits on the seed are on non-stereo 2S OT sensors. 
+    // The KF can not use these, so we bail out as for invalid propagations. 
     if (!propagated.isValid() || std::isnan(propagated.globalMomentum().mag())) {
       return false;
     }
 
     // clone the hit based on the propagated state
     SeedingHitSet::ConstRecHitPointer tthp = seedHits[ih];
+  // std::cout << __LINE__ << std::endl; 
     auto newtth = static_cast<SeedingHitSet::RecHitPointer>(state.cloner(*tthp, propagated));
+    if (std::isnan(propagated.globalMomentum().mag())){
+      std::cout << __LINE__ << std::endl; 
+      std::cout << " ============================== "<< std::endl; 
+      std::cout << " Problematic seed is constructed from the following points (from start to target): "<< std::endl; 
+      std::cout << "    "<<start<< std::endl; 
+      std::cout << "    "<<middle<< std::endl; 
+      std::cout << "    "<<target<< std::endl; 
+      std::cout << " We are in KF iteration "<<ih<<" of "<<seedHits.size()<<std::endl; 
+      std::cout << " seed mom vector " <<gv << std::endl; 
+      std::cout << " propagated = "<<propagated<< std::endl; 
+      std::cout << " propagated.isValid = "<<propagated.isValid()<< std::endl; 
+      return false; 
+    }
     updated = state.theUpdator->update(propagated, *newtth);
     hits.push_back(newtth);
 

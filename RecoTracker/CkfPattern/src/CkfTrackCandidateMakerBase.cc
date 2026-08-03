@@ -35,6 +35,9 @@
 #include <algorithm>
 #include <functional>
 
+// ### AAAAAAAAAAAAAAAAH I HATE IT SO MUCH 
+// #define LogDebug(args) LogDebug("CKFCandMakerBase") << args <<": "
+
 // #define VI_SORTSEED
 // #define VI_REPRODUCIBLE
 // #define VI_TBB
@@ -116,7 +119,7 @@ namespace cms {
 #endif
 
 #ifdef VI_REPRODUCIBLE
-    std::cout << "CkfTrackCandidateMaker in reproducible setting" << std::endl;
+    LogDebug("CKFCandMakerBase") << "CkfTrackCandidateMaker in reproducible setting" << std::endl;
     assert(nullptr == theSeedCleaner);
     assert(0 >= maxSeedsBeforeCleaning_);
 #endif
@@ -155,24 +158,27 @@ namespace cms {
 
     std::unique_ptr<MeasurementTrackerEvent> dataWithMasks;
     if (skipClusters_) {
+      LogDebug("CKFCandMakerBase") << " skip clusters"<< std::endl; 
       edm::Handle<PixelClusterMask> pixelMask;
       e.getByToken(maskPixels_, pixelMask);
       edm::Handle<StripClusterMask> stripMask;
       e.getByToken(maskStrips_, stripMask);
       dataWithMasks = std::make_unique<MeasurementTrackerEvent>(*data, *stripMask, *pixelMask);
-      //std::cout << "Trajectory builder " << conf_.getParameter<std::string>("@module_label") << " created with masks " << std::endl;
+      //LogDebug("CKFCandMakerBase") << "Trajectory builder " << conf_.getParameter<std::string>("@module_label") << " created with masks " << std::endl;
       theTrajectoryBuilder->setEvent(e, es, &*dataWithMasks);
     } else if (skipPhase2Clusters_) {
+      LogDebug("CKFCandMakerBase") << " skip P2 clusters"<< std::endl; 
       //FIXME:just temporary solution for phase2!
       edm::Handle<PixelClusterMask> pixelMask;
       e.getByToken(maskPixels_, pixelMask);
       edm::Handle<Phase2OTClusterMask> phase2OTMask;
       e.getByToken(maskPhase2OTs_, phase2OTMask);
       dataWithMasks = std::make_unique<MeasurementTrackerEvent>(*data, *pixelMask, *phase2OTMask);
-      //std::cout << "Trajectory builder " << conf_.getParameter<std::string>("@module_label") << " created with phase2 masks " << std::endl;
+      //LogDebug("CKFCandMakerBase") << "Trajectory builder " << conf_.getParameter<std::string>("@module_label") << " created with phase2 masks " << std::endl;
       theTrajectoryBuilder->setEvent(e, es, &*dataWithMasks);
     } else {
-      //std::cout << "Trajectory builder " << conf_.getParameter<std::string>("@module_label") << " created without masks " << std::endl;
+      LogDebug("CKFCandMakerBase") << " do not skip any clusters"<< std::endl; 
+      //LogDebug("CKFCandMakerBase") << "Trajectory builder " << conf_.getParameter<std::string>("@module_label") << " created without masks " << std::endl;
       theTrajectoryBuilder->setEvent(e, es, &*data);
     }
     // TISE ES must be set here due to dependence on theTrajectoryBuilder
@@ -220,12 +226,14 @@ namespace cms {
 
       // Loop over seeds
       size_t collseed_size = collseed->size();
+      LogDebug("CKFCandMakerBase") << " Seed collection has size "<<collseed_size << std::endl; 
 
       unsigned int indeces[collseed_size];
       for (auto i = 0U; i < collseed_size; ++i)
         indeces[i] = i;
 
 #ifdef VI_SORTSEED
+      LogDebug("CKFCandMakerBase") << " VI SORTSEED" << std::endl; 
       // std::random_shuffle(indeces,indeces+collseed_size);
 
       // here only for reference: does not seems to help
@@ -253,10 +261,11 @@ namespace cms {
       */
       std::sort(indeces, indeces + collseed_size, [&](unsigned int i, unsigned int j) { return val[i] < val[j]; });
 
-      // std::cout << spt(indeces[0]) << ' ' << spt(indeces[collseed_size-1]) << std::endl;
+      // LogDebug("CKFCandMakerBase") << spt(indeces[0]) << ' ' << spt(indeces[collseed_size-1]) << std::endl;
 #endif
 
       std::atomic<unsigned int> ntseed(0);
+      LogDebug("CKFCandMakerBase") << " enter seed loop "<< std::endl; 
       auto theLoop = [&](size_t ii) {
         auto j = indeces[ii];
 
@@ -282,6 +291,7 @@ namespace cms {
         unsigned int nCandPerSeed = 0;
         theTrajectoryBuilder->buildTrajectories((*collseed)[j], theTmpTrajectories, nCandPerSeed, nullptr);
         {
+          LogDebug("CKFCandMakerBase") << " no trajectory for seed "<<j<<std::endl; 
           Lock lock(theMutex);
           (*outputSeedStopInfos)[j].setCandidatesPerSeed(nCandPerSeed);
           if (theTmpTrajectories.empty()) {
@@ -289,7 +299,6 @@ namespace cms {
             return;  // from the lambda!
           }
         }
-
         LogDebug("CkfPattern") << "======== In-out trajectory building found " << theTmpTrajectories.size()
                                << " trajectories from seed " << j << " ========\n"
                                << PrintoutHelper::dumpCandidates(theTmpTrajectories);
@@ -374,7 +383,7 @@ namespace cms {
       if (theSeedCleaner)
         theSeedCleaner->done();
 
-      // std::cout << "VICkfPattern " << "rawResult trajectories found = " << rawResult.size() << " in " << ntseed << " seeds " << collseed_size << std::endl;
+      // LogDebug("CKFCandMakerBase") << "VICkfPattern " << "rawResult trajectories found = " << rawResult.size() << " in " << ntseed << " seeds " << collseed_size << std::endl;
 
 #ifdef VI_REPRODUCIBLE
       // sort trajectory
@@ -515,7 +524,7 @@ namespace cms {
           << PrintoutHelper::regressionTest(es.getData(theTrackerToken), unsmoothedResult);
 
       assert(viTotHits >= 0);  // just to use it...
-      // std::cout << "VICkfPattern result " << output->size() << " " << viTotHits << std::endl;
+      // LogDebug("CKFCandMakerBase") << "VICkfPattern result " << output->size() << " " << viTotHits << std::endl;
 
       if (theTrajectoryOutput) {
         outputT->swap(unsmoothedResult);

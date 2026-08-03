@@ -60,13 +60,25 @@ vector<const DetLayer*> SimpleForwardNavigableLayer::nextLayers(const FreeTrajec
   // This method contains the sequence in which the layers are tested.
   // The iteration stops as soon as a layer contains the propagated state
   // within epsilon
-
+  LogDebug("SimpleForwardNavigableLayer") << " Hit pos is "<<fts.position() << " R = " <<fts.position().perp()<<std::endl; 
+  LogDebug("SimpleForwardNavigableLayer") << "call nextLayers "<<std::endl;
+  LogDebug("SimpleForwardNavigableLayer") << " theDetLayer position "<< theDetLayer->position()<< std::endl;     
+  LogDebug("SimpleForwardNavigableLayer") << " theDetLayer location " << theDetLayer->location()  << std::endl;              
+  LogDebug("SimpleForwardNavigableLayer") << " theDetLayer subdet " << theDetLayer->subDetector()  << std::endl;              
+  LogDebug("SimpleForwardNavigableLayer") << " theOuterBarrelLayers size " << theOuterBarrelLayers.size()  << std::endl;              
+  LogDebug("SimpleForwardNavigableLayer") << " theInnerBarrelLayers size " << theInnerBarrelLayers.size()  << std::endl;              
+  LogDebug("SimpleForwardNavigableLayer") << " theInnerLayers size " << theInnerLayers.size()  << std::endl;              
+  LogDebug("SimpleForwardNavigableLayer") << " theOuterLayers size " << theOuterLayers.size()  << std::endl;              
+  LogDebug("SimpleForwardNavigableLayer") << " theInnerForwardLayers size " << theInnerForwardLayers.size()  << std::endl;              
+  LogDebug("SimpleForwardNavigableLayer") << " theOuterForwardLayers size " << theOuterForwardLayers.size()  << std::endl;                   
   vector<const DetLayer*> result;
 
   FreeTrajectoryState ftsWithoutErrors = (fts.hasError()) ? FreeTrajectoryState(fts.parameters()) : fts;
 
   auto const position = fts.position();
   auto const momentum = fts.momentum();
+  LogDebug("SimpleForwardNavigableLayer") << " pos "<<position<<std::endl; 
+  LogDebug("SimpleForwardNavigableLayer") << " mom "<<momentum<<std::endl; 
 
   //establish whether the tracks is crossing the tracker from outer layers to inner ones
   //or from inner to outer
@@ -81,6 +93,12 @@ vector<const DetLayer*> SimpleForwardNavigableLayer::nextLayers(const FreeTrajec
       (!(dir == oppositeToMomentum) && isInOutTrackBarrel) || ((dir == oppositeToMomentum) && !isInOutTrackBarrel);
   bool dirOppositeXORisInOutTrackFWD =
       (!(dir == oppositeToMomentum) && isInOutTrackFWD) || ((dir == oppositeToMomentum) && !isInOutTrackFWD);
+
+
+  LogDebug("SimpleForwardNavigableLayer") << " isInOutTrackFWD "<<isInOutTrackFWD<<std::endl; 
+  LogDebug("SimpleForwardNavigableLayer") << " isInOutTrackBarrel "<<isInOutTrackBarrel<<std::endl; 
+  LogDebug("SimpleForwardNavigableLayer") << " dirOppositeXORisInOutTrackBarrel "<<dirOppositeXORisInOutTrackBarrel<<std::endl; 
+  LogDebug("SimpleForwardNavigableLayer") << " dirOppositeXORisInOutTrackFWD "<<dirOppositeXORisInOutTrackFWD<<std::endl; 
   //bool dirOppositeXORisInOutTrack = ( !(dir == oppositeToMomentum) && isInOutTrack) || ( (dir == oppositeToMomentum) && !isInOutTrack);
 
   if LIKELY (dirOppositeXORisInOutTrackFWD && dirOppositeXORisInOutTrackBarrel) {  //standard tracks

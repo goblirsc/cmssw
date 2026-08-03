@@ -81,6 +81,21 @@ vector<const DetLayer*> SimpleBarrelNavigableLayer::nextLayers(const FreeTraject
   // This method contains the sequence in which the layers are tested.
   // The iteration stops as soon as a layer contains the propagated state
   // within epsilon.
+  LogDebug("SimpleBarrelNavigableLayer")  << " Hit pos is "<<fts.position() << " R = " <<fts.position().perp()<<std::endl; 
+  LogDebug("SimpleBarrelNavigableLayer") << "call nextLayers "<<std::endl;
+  LogDebug("SimpleBarrelNavigableLayer")  << " theDetLayer position "<< theDetLayer->position()<< std::endl;     
+  LogDebug("SimpleBarrelNavigableLayer")  << " theDetLayer location " << theDetLayer->location()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theDetLayer subdet " << theDetLayer->subDetector()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theOuterBarrelLayers size " << theOuterBarrelLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theInnerBarrelLayers size " << theInnerBarrelLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theOuterLeftForwardLayers size " << theOuterLeftForwardLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theOuterRightForwardLayers size " << theOuterRightForwardLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theInnerLeftForwardLayers size " << theInnerLeftForwardLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theInnerRightForwardLayers size " << theInnerRightForwardLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theNegOuterLayers size " << theNegOuterLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " thePosOuterLayers size " << thePosOuterLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " theNegInnerLayers size " << theNegInnerLayers.size()  << std::endl;              
+  LogDebug("SimpleBarrelNavigableLayer")  << " thePosInnerLayers size " << thePosInnerLayers.size()  << std::endl;              
 
   vector<const DetLayer*> result;
 
@@ -89,10 +104,13 @@ vector<const DetLayer*> SimpleBarrelNavigableLayer::nextLayers(const FreeTraject
   auto const position = fts.position();
   auto const momentum = fts.momentum();
 
+
   //establish whether the tracks is crossing the tracker from outer layers to inner ones
   //or from inner to outer.
   GlobalVector transversePosition(position.x(), position.y(), 0);
   bool isInOutTrackBarrel = (transversePosition.dot(momentum) > 0);
+  LogDebug("SimpleBarrelNavigableLayer") << " transversepos "<<transversePosition<< std::endl;  
+  LogDebug("SimpleBarrelNavigableLayer") << " momentum "<<momentum<< std::endl;  
 
   float zpos = position.z();
   bool isInOutTrackFWD = momentum.z() * zpos > 0;
@@ -104,15 +122,16 @@ vector<const DetLayer*> SimpleBarrelNavigableLayer::nextLayers(const FreeTraject
   bool dirOppositeXORisInOutTrackFWD =
       (!(dir == oppositeToMomentum) && isInOutTrackFWD) || ((dir == oppositeToMomentum) && !isInOutTrackFWD);
 
-  LogDebug("SimpleBarrelNavigableLayer") << "is alongMomentum? " << (dir == alongMomentum) << endl
-                                         << "isInOutTrackBarrel: " << isInOutTrackBarrel << endl
-                                         << "isInOutTrackFWD: " << isInOutTrackFWD << endl
-                                         << "dirOppositeXORisInOutTrackFWD: " << dirOppositeXORisInOutTrackFWD << endl
-                                         << "dirOppositeXORisInOutTrackBarrel: " << dirOppositeXORisInOutTrackBarrel
-                                         << endl;
-
   bool signZmomentumXORdir =
       (((momentum.z() > 0) && !(dir == alongMomentum)) || (!(momentum.z() > 0) && (dir == alongMomentum)));
+  LogDebug("SimpleBarrelNavigableLayer") << "  is alongMomentum? " << (dir == alongMomentum) << endl
+                                         << "  isInOutTrackBarrel: " << isInOutTrackBarrel << endl
+                                         << "  isInOutTrackFWD: " << isInOutTrackFWD << endl
+                                         << "  dirOppositeXORisInOutTrackFWD: " << dirOppositeXORisInOutTrackFWD << endl
+                                         << "  dirOppositeXORisInOutTrackBarrel: " << dirOppositeXORisInOutTrackBarrel
+                                         << "  signZmomentumXORdir: " << signZmomentumXORdir
+                                         << endl;
+
 
   if LIKELY (dirOppositeXORisInOutTrackBarrel && dirOppositeXORisInOutTrackFWD) {
     if (signZmomentumXORdir) {
@@ -142,8 +161,11 @@ vector<const DetLayer*> SimpleBarrelNavigableLayer::nextLayers(const FreeTraject
     } else {
       wellInside(ftsWithoutErrors, dir, theInnerRightForwardLayers.begin(), theInnerRightForwardLayers.end(), result);
     }
+    LogDebug("SimpleBarrelNaviableLayer")<< " targeting outer barrel - "<<theOuterBarrelLayers.size()<<" candidates "<< std::endl; 
     wellInside(ftsWithoutErrors, dir, theOuterBarrelLayers.begin(), theOuterBarrelLayers.end(), result);
+    
   }
+  LogDebug("SimpleBarrelNaviableLayer")<< " Navigation found  - "<<result.size()<<" total candidates "<< std::endl; 
 
   bool goingIntoTheBarrel =
       (!isInOutTrackBarrel && dir == alongMomentum) || (isInOutTrackBarrel && dir == oppositeToMomentum);

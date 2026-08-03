@@ -105,6 +105,7 @@ void CosmicNavigationSchool::build(const GeometricSearchTracker* theInputTracker
 
   // Get barrel layers
   vector<BarrelDetLayer const*> const& blc = theTracker->barrelLayers();
+  std::cout << " CosmicNavigationSchool: Found "<<blc.size()<<" Barrel layers "<< std::endl; 
   for (auto i = blc.begin(); i != blc.end(); i++) {
     if (conf.noPXB && GeomDetEnumerators::isTrackerPixel((*i)->subDetector()))
       continue;
@@ -114,9 +115,11 @@ void CosmicNavigationSchool::build(const GeometricSearchTracker* theInputTracker
       continue;
     theBarrelLayers.push_back((*i));
   }
+  std::cout << " CosmicNavigationSchool: Kept "<<theBarrelLayers.size()<<" Barrel layers" << std::endl; 
 
   // get forward layers
   vector<ForwardDetLayer const*> const& flc = theTracker->forwardLayers();
+  std::cout << " CosmicNavigationSchool: Found "<<flc.size()<<" Forward layers "<< std::endl; 
   for (auto i = flc.begin(); i != flc.end(); i++) {
     if (conf.noPXF && GeomDetEnumerators::isTrackerPixel((*i)->subDetector()))
       continue;
@@ -126,6 +129,7 @@ void CosmicNavigationSchool::build(const GeometricSearchTracker* theInputTracker
       continue;
     theForwardLayers.push_back((*i));
   }
+  std::cout << " CosmicNavigationSchool: Kept "<<theForwardLayers.size()<<" Forward layers "<< std::endl; 
 
   FDLI middle =
       find_if(theForwardLayers.begin(), theForwardLayers.end(), [](auto const* a) { return a->position().z() >= 0.0; });
@@ -145,6 +149,7 @@ void CosmicNavigationSchool::build(const GeometricSearchTracker* theInputTracker
 
     //add TOB1->TOB1 inward link
     const std::vector<const BarrelDetLayer*>& tobL = theInputTracker->tobLayers();
+    std::cout << tobL.size() << " TOB layers" << std::endl;
     if (!tobL.empty()) {
       if (conf.allSelf) {
         LogDebug("CosmicNavigationSchool") << " adding all TOB self search.";
@@ -158,6 +163,7 @@ void CosmicNavigationSchool::build(const GeometricSearchTracker* theInputTracker
       }
     }
     const std::vector<const BarrelDetLayer*>& tibL = theInputTracker->tibLayers();
+    std::cout << tibL.size() << " TIB layers" << std::endl;
     if (!tibL.empty()) {
       if (conf.allSelf) {
         LogDebug("CosmicNavigationSchool") << " adding all TIB self search.";
@@ -171,6 +177,7 @@ void CosmicNavigationSchool::build(const GeometricSearchTracker* theInputTracker
       }
     }
     const std::vector<const BarrelDetLayer*>& pxbL = theInputTracker->pixelBarrelLayers();
+    std::cout << pxbL.size() << " PXB layers" << std::endl;
     if (!pxbL.empty()) {
       if (conf.allSelf) {
         LogDebug("CosmicNavigationSchool") << " adding all PXB self search.";
