@@ -16,14 +16,14 @@ Jet Impact parameter information for displaced tau collection : Pritam Palit, cr
 #include "DataFormats/PatCandidates/interface/PackedCandidate.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 
-void vector_test(std::vector<Float_t>& values) {
+void vector_test(std::vector<Float_t>& values, const std::string & origin) {
   for (auto& value : values) {
     if (std::isnan(value)) {
-      throw std::runtime_error("Jet IP output: NaN detected.");
+      edm::LogWarning("JetImpactParameters")<< "Jet IP output: NaN detected in "<<origin<<".";
     } else if (std::isinf(value)) {
-      throw std::runtime_error("Jet IP output: Infinity detected.");
+      edm::LogWarning("JetImpactParameters")<< "Jet IP output: Infinity detected in "<<origin<<".";
     } else if (!std::isfinite(value)) {
-      throw std::runtime_error("Jet IP output: Non-standard value detected.");
+      edm::LogWarning("JetImpactParameters")<< "Jet IP output: Non-standard value detected in "<<origin<<".";
     }
   }
 }
@@ -100,11 +100,11 @@ void JetImpactParameters::produce(edm::Event& event, const edm::EventSetup& setu
     }
   }
 
-  vector_test(v_jetDxy);
-  vector_test(v_jetDz);
-  vector_test(v_jetDxyError);
-  vector_test(v_jetDzError);
-  vector_test(v_jetCharge);
+  vector_test(v_jetDxy,"v_jetDxy");
+  vector_test(v_jetDz,"v_jetDz");
+  vector_test(v_jetDxyError,"v_jetDxyError");
+  vector_test(v_jetDzError,"v_jetDzError");
+  vector_test(v_jetCharge,"v_jetCharge");
 
   auto vm_jetDxy = std::make_unique<edm::ValueMap<Float_t>>();
   edm::ValueMap<Float_t>::Filler filler_jetDxy(*vm_jetDxy);
