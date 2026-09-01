@@ -196,6 +196,11 @@ bool ReferenceTrajectory::construct(const TrajectoryStateOnSurface &refTsos,
   for (itRecHit = recHits.begin(); itRecHit != recHits.end(); ++itRecHit) {
     const TransientTrackingRecHit::ConstRecHitPointer &hitPtr = *itRecHit;
     allRecHits.push_back(hitPtr);
+    if (hitPtr->getRTTI() == 12){
+      edm::LogWarning("Alignment") << "@SUB=ReferenceTrajectory::construct"
+                                 << "No vector hits supported at the moment. Skip track.";
+      return false; 
+    }
   }
 
   for (itRecHit = allRecHits.begin(); itRecHit != allRecHits.end(); ++itRecHit) {
